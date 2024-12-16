@@ -1,0 +1,8 @@
+[package]
+name = "pixels-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+micromath = { version = "2.1.0", features = ["vector"] }
+minifb = { version = "0.27.0", default-features = false }
