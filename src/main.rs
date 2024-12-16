@@ -1,6 +1,6 @@
-#[allow(unused_imports)]
+use line_drawing::Bresenham;
 use micromath::{
-    F32Ext, Quaternion,
+    Quaternion,
     vector::{F32x3, I32x2},
 };
 use minifb::{Key, Window, WindowOptions};
@@ -58,6 +58,8 @@ fn main() {
     let mut rotation = Quaternion::IDENTITY;
     let mut last_time = Instant::now();
     let mut last_fps_update = Instant::now();
+    let half_width = (WIDTH / 2) as i32;
+    let half_height = (HEIGHT / 2) as i32;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let frame_start = Instant::now();
@@ -68,6 +70,9 @@ fn main() {
         // Update rotation based on keyboard input
         if window.is_key_down(Key::Left) {
             let q = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), -ROTATION_SPEED);
+            rotation = q * rotation;
+        } else {
+            let q = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), -0.01);
             rotation = q * rotation;
         }
         if window.is_key_down(Key::Right) {
@@ -92,8 +97,8 @@ fn main() {
                 let y = rotated.y;
                 let z = rotated.z + PROJECTION_DISTANCE;
 
-                let px = ((x * FOV) / z) as i32 + (WIDTH / 2) as i32;
-                let py = ((y * FOV) / z) as i32 + (HEIGHT / 2) as i32;
+                let px = ((x * FOV) / z) as i32 + half_width;
+                let py = ((y * FOV) / z) as i32 + half_height;
                 I32x2::from((px, py))
             })
             .collect();
@@ -120,38 +125,16 @@ fn main() {
 
         let frame_time = frame_start.elapsed();
         if frame_time < FRAME_TIME {
-            std::thread::sleep(FRAME_TIME - frame_time);
+            //std::thread::sleep(FRAME_TIME - frame_time);
         }
     }
 }
 
 #[inline]
 fn draw_line(buffer: &mut [u32], start: &I32x2, end: &I32x2) {
-    let (mut x0, mut y0) = (start.x, start.y);
-    let (x1, y1) = (end.x, end.y);
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-
-    loop {
-        if x0 >= 0 && x0 < WIDTH as i32 && y0 >= 0 && y0 < HEIGHT as i32 {
-            buffer[y0 as usize * WIDTH + x0 as usize] = 0xFFFFFF;
-        }
-
-        if x0 == x1 && y0 == y1 {
-            break;
-        }
-
-        let e2 = err * 2;
-        if e2 >= dy {
-            err += dy;
-            x0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y0 += sy;
+    for (x, y) in Bresenham::new((start.x, start.y), (end.x, end.y)) {
+        if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
+            buffer[y as usize * WIDTH + x as usize] = 0xFFFFFF;
         }
     }
 }
