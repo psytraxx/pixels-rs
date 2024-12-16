@@ -69,10 +69,18 @@ fn main() {
         angle_x += 0.02;
         angle_y += 0.03;
 
+        // Rotation around the X axis
+        let cos_x = angle_x.cos();
+        let sin_x = angle_x.sin();
+
+        // Rotation around the Y axis
+        let cos_y = angle_y.cos();
+        let sin_y = angle_y.sin();
+
         // Transform and project vertices
         let mut projected_vertices: [Vector2d<i32>; 8] = [Vector2d { x: 0, y: 0 }; 8];
         for (i, &vertex) in cube_vertices.iter().enumerate() {
-            let rotated_vertex = rotate_vertex(vertex, angle_x, angle_y);
+            let rotated_vertex = rotate_vertex(vertex, cos_x, sin_x, cos_y, sin_y);
             projected_vertices[i] = project_vertex(rotated_vertex);
         }
 
@@ -104,19 +112,18 @@ fn main() {
 }
 
 /// Rotates a vertex around the X and Y axes.
-fn rotate_vertex(vertex: Vector3d<F32>, angle_x: F32, angle_y: F32) -> Vector3d<F32> {
-    // Rotation around the X axis
-    let cos_x = angle_x.cos();
-    let sin_x = angle_x.sin();
+fn rotate_vertex(
+    vertex: Vector3d<F32>,
+    cos_x: F32,
+    sin_x: F32,
+    cos_y: F32,
+    sin_y: F32,
+) -> Vector3d<F32> {
     let rotated_x = Vector3d {
         x: vertex.x,
         y: vertex.y * cos_x - vertex.z * sin_x,
         z: vertex.y * sin_x + vertex.z * cos_x,
     };
-
-    // Rotation around the Y axis
-    let cos_y = angle_y.cos();
-    let sin_y = angle_y.sin();
 
     Vector3d {
         x: rotated_x.x * cos_y + rotated_x.z * sin_y,
