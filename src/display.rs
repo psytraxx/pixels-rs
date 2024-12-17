@@ -47,9 +47,38 @@ pub struct Display<'a> {
     framebuf: FrameBuf<Rgb565, DisplayBuffer>,
 }
 
+/// Display interface trait for ST7789 LCD controller
+///
+/// Provides basic drawing operations for text and primitives.
+/// Implementations should handle the low-level display communication.
 pub trait DisplayTrait {
+    /// Writes text to the display at the specified position
+    ///
+    /// # Arguments
+    /// * `text` - The text string to display
+    /// * `position` - Starting position coordinates as Point(x,y)
+    ///
+    /// # Returns
+    /// * `Ok(())` on successful write
+    /// * `Err(Error)` if the write operation fails
     fn write(&mut self, text: &str, position: Point) -> Result<(), Error>;
+
+    /// Updates the display with the current framebuffer contents
+    ///
+    /// # Returns
+    /// * `Ok(())` on successful update
+    /// * `Err(Error)` if the update operation fails
     fn update_with_buffer(&mut self) -> Result<(), Error>;
+
+    /// Draws a line between two points
+    ///
+    /// # Arguments
+    /// * `begin` - Starting point coordinates as Point(x,y)  
+    /// * `end` - Ending point coordinates as Point(x,y)
+    ///
+    /// # Returns
+    /// * `Ok(())` on successful line draw
+    /// * `Err(Error)` if the draw operation fails
     fn draw_line(&mut self, begin: Point, end: Point) -> Result<(), Error>;
 }
 
@@ -131,6 +160,8 @@ impl<'a> DisplayTrait for Display<'a> {
         self.framebuf.clear(RgbColor::BLACK)?;
 
         self.display.draw_iter(self.framebuf.into_iter())?;
+        //let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
+        //self.display.set_pixels(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, pixel_iterator)?;
 
         Ok(())
     }
