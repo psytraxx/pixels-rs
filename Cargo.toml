@@ -29,7 +29,6 @@ esp-hal-embassy = { version = "0.5.0", features = [
 ] }
 mipidsi = "0.8.0"
 display-interface-parallel-gpio = "0.7.0"
-embedded-text = "0.7.2"
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
