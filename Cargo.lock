@@ -179,6 +179,9 @@ name = "display-interface"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ba2aab1ef3793e6f7804162debb5ac5edb93b3d650fbcc5aeb72fcd0e6c03a0"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "display-interface-parallel-gpio"
@@ -340,6 +343,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-dma"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "994f7e5b5cb23521c22304927195f236813053eb9c065dd2226a32ba64695446"
+dependencies = [
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "embedded-graphics"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -362,6 +374,16 @@ dependencies = [
  "az",
  "byteorder",
  "defmt",
+]
+
+[[package]]
+name = "embedded-graphics-framebuf"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22354420f68727fa24d1e2741dae1e9a041065e80fb63b35a8d19c647a85be76"
+dependencies = [
+ "embedded-dma",
+ "embedded-graphics",
 ]
 
 [[package]]
@@ -988,10 +1010,12 @@ version = "0.1.0"
 dependencies = [
  "defmt",
  "defmt-rtt",
+ "display-interface",
  "display-interface-parallel-gpio",
  "embassy-executor",
  "embassy-time",
  "embedded-graphics",
+ "embedded-graphics-framebuf",
  "embedded-hal 1.0.0",
  "embedded-text",
  "esp-alloc",

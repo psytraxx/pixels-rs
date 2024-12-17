@@ -1,11 +1,13 @@
 #![no_std]
 #![no_main]
+#![feature(generic_arg_infer)]
 
-use defmt::info;
+use alloc::format;
+use config::DISPLAY_HEIGHT;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
 use embassy_time::Instant;
-use embedded_graphics::{pixelcolor::Rgb565, prelude::RgbColor};
+use embedded_graphics::prelude::Point;
 use esp_alloc::heap_allocator;
 use esp_hal::clock::CpuClock;
 use esp_hal_embassy::main;
@@ -16,12 +18,10 @@ use micromath::{
 };
 use {defmt_rtt as _, esp_backtrace as _};
 
+extern crate alloc;
+
 mod config;
 mod display;
-
-const WIDTH: usize = 320;
-const HEIGHT: usize = 170;
-const BUFFER_SIZE: usize = WIDTH * HEIGHT;
 
 // Cube and projection constants
 const FOV: f32 = 150.0; // Field of View
@@ -30,9 +30,6 @@ const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
 async fn main(_spawner: Spawner) {
-    let mut buffer: Vec<Rgb565, BUFFER_SIZE> = Vec::new(); // Initialize the framebuffer
-    buffer.resize(BUFFER_SIZE, Rgb565::BLACK).unwrap(); // Fill the buffer with zeros
-
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::Clock240MHz;
@@ -90,15 +87,14 @@ async fn main(_spawner: Spawner) {
 
     let mut rotation = Quaternion::IDENTITY;
     let mut last_time = 0;
-    let half_width = (WIDTH / 2) as i32;
-    let half_height = (HEIGHT / 2) as i32;
+    let half_width = (DISPLAY_HEIGHT / 2) as i32;
+    let half_height = (DISPLAY_HEIGHT / 2) as i32;
 
     //while window.is_open() && !window.is_key_down(Key::Escape) {
 
     loop {
         // FPS calculation and display
         let current_time = Instant::now().as_millis();
-        buffer.fill(Rgb565::BLACK);
 
         /* // Update rotation based on keyboard input
         if window.is_key_down(Key::Left) {
@@ -121,7 +117,7 @@ async fn main(_spawner: Spawner) {
             rotation = q * rotation;
         } */
 
-        let q = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), -0.10);
+        let q = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
         rotation = q * rotation;
 
         // Transform and project vertices
@@ -141,48 +137,23 @@ async fn main(_spawner: Spawner) {
 
         // Draw edges
         for &(start, end) in &edges {
-            draw_line(
-                &mut buffer,
-                &transformed_vertices[start],
-                &transformed_vertices[end],
-            );
+            let begin = Point::new(transformed_vertices[start].x, transformed_vertices[start].y);
+            let end = Point::new(transformed_vertices[end].x, transformed_vertices[end].y);
+            display.draw_line(begin, end).expect("Draw line failed");
         }
 
         let ms_per_frame = current_time - last_time;
         if (ms_per_frame) > 0 {
-            info!("FPS: {}", 1000 / ms_per_frame);
+            let text = format!("FPS: {}", 1000 / ms_per_frame);
+            display
+                .write(&text, Point::new(0, 0))
+                .expect("Write text failed");
         }
 
         last_time = current_time;
 
-        display.update_with_buffer(&buffer).unwrap();
-    }
-}
-
-#[inline]
-fn draw_line(buffer: &mut [Rgb565], start: &I32x2, end: &I32x2) {
-    let (mut x0, mut y0) = (start.x, start.y);
-    let (x1, y1) = (end.x, end.y);
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-    loop {
-        if x0 >= 0 && x0 < WIDTH as i32 && y0 >= 0 && y0 < HEIGHT as i32 {
-            buffer[y0 as usize * WIDTH + x0 as usize] = Rgb565::WHITE;
-        }
-        if x0 == x1 && y0 == y1 {
-            break;
-        }
-        let e2 = err * 2;
-        if e2 >= dy {
-            err += dy;
-            x0 += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y0 += sy;
-        }
+        display
+            .update_with_buffer()
+            .expect("Update with buffer failed");
     }
 }

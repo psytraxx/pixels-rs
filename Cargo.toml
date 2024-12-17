@@ -33,7 +33,8 @@ embedded-text = "0.7.2"
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
-
+embedded-graphics-framebuf = "0.5.0"
+display-interface = { version = "0.5.0", features = ["defmt-03"] }
 
 [profile.dev]
 # Rust debug is too slow.

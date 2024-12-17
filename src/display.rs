@@ -1,18 +1,16 @@
 use core::convert::Infallible;
-use defmt::Format;
 use display_interface_parallel_gpio::{DisplayError, Generic8BitBus, PGPIO8BitInterface};
 use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::geometry::{Dimensions, Point};
+use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
+use embedded_graphics::prelude::Primitive;
+use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
-use embedded_text::alignment::HorizontalAlignment;
-use embedded_text::style::{HeightMode, TextBoxStyleBuilder};
-use embedded_text::TextBox;
+use embedded_graphics_framebuf::FrameBuf;
 use esp_hal::gpio::{GpioPin, Level, Output};
-use heapless::Vec;
 use mipidsi::error::InitError;
 use mipidsi::models::ST7789;
 use mipidsi::options::{ColorInversion, Orientation, Rotation};
@@ -21,6 +19,9 @@ use mipidsi::{Builder, Display as MipiDisplay};
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
+pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
+
+type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
 type MipiDisplayWrapper<'a> = MipiDisplay<
     PGPIO8BitInterface<
@@ -43,12 +44,13 @@ type MipiDisplayWrapper<'a> = MipiDisplay<
 
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
+    framebuf: FrameBuf<Rgb565, DisplayBuffer>,
 }
 
 pub trait DisplayTrait {
-    fn write(&mut self, text: &str) -> Result<(), Error>;
-    fn write_multiline(&mut self, text: &str) -> Result<(), Error>;
-    fn update_with_buffer(&mut self, buffer: &heapless::Vec<Rgb565, 54400>) -> Result<(), Error>;
+    fn write(&mut self, text: &str, position: Point) -> Result<(), Error>;
+    fn update_with_buffer(&mut self) -> Result<(), Error>;
+    fn draw_line(&mut self, begin: Point, end: Point) -> Result<(), Error>;
 }
 
 pub struct DisplayPeripherals {
@@ -103,46 +105,32 @@ impl<'a> Display<'a> {
             .init(&mut embassy_time::Delay)?;
 
         backlight.set_high();
+        let data = [Rgb565::BLACK; LCD_PIXELS];
+        let framebuf: FrameBuf<Rgb565, [Rgb565; _]> =
+            FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
 
-        Ok(Self { display })
-    }
-
-    fn clear(&mut self) -> Result<(), Error> {
-        self.display.clear(RgbColor::BLUE)?;
-        Ok(())
+        Ok(Self { display, framebuf })
     }
 }
 
 impl<'a> DisplayTrait for Display<'a> {
-    fn write(&mut self, text: &str) -> Result<(), Error> {
-        self.clear()?;
-        Text::with_baseline(text, Point::new(0, 0), TEXT_STYLE, Baseline::Top)
-            .draw(&mut self.display)?;
+    fn write(&mut self, text: &str, position: Point) -> Result<(), Error> {
+        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.framebuf)?;
         Ok(())
     }
 
-    fn write_multiline(&mut self, text: &str) -> Result<(), Error> {
-        self.clear()?;
-        let textbox_style = TextBoxStyleBuilder::new()
-            .height_mode(HeightMode::FitToText)
-            .alignment(HorizontalAlignment::Justified)
-            .build();
-
-        // Create the text box and apply styling options.
-        let text_box = TextBox::with_textbox_style(
-            text,
-            self.display.bounding_box(),
-            TEXT_STYLE,
-            textbox_style,
-        );
-        // Draw the text box.
-        text_box.draw(&mut self.display)?;
+    fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Error> {
+        Line::new(start, end)
+            .into_styled(PrimitiveStyle::with_stroke(RgbColor::GREEN, 2))
+            .draw(&mut self.framebuf)?;
         Ok(())
     }
 
-    fn update_with_buffer(&mut self, buffer: &Vec<Rgb565, 54400>) -> Result<(), Error> {
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, buffer.iter().cloned())?;
+    fn update_with_buffer(&mut self) -> Result<(), Error> {
+        // Clear the frame buffer
+        self.framebuf.clear(RgbColor::BLACK)?;
+
+        self.display.draw_iter(self.framebuf.into_iter())?;
 
         Ok(())
     }
@@ -151,18 +139,8 @@ impl<'a> DisplayTrait for Display<'a> {
 /// A clock error
 #[derive(Debug)]
 pub enum Error {
-    DisplayInterface(DisplayError),
-    InitError,
-}
-
-impl Format for Error {
-    fn format(&self, f: defmt::Formatter) {
-        match self {
-            //Error::DisplayInterface(e) => defmt::write!(f, "Display error {}", e),
-            Error::DisplayInterface(_) => defmt::write!(f, "Display error"),
-            Error::InitError => defmt::write!(f, "Init error"),
-        }
-    }
+    DisplayInterface(#[expect(unused, reason = "Never read directly")] DisplayError),
+    Infallible,
 }
 
 impl From<DisplayError> for Error {
@@ -173,6 +151,11 @@ impl From<DisplayError> for Error {
 
 impl From<InitError<Infallible>> for Error {
     fn from(_: InitError<Infallible>) -> Self {
-        Self::InitError
+        Self::Infallible
+    }
+}
+impl From<Infallible> for Error {
+    fn from(_: Infallible) -> Self {
+        Self::Infallible
     }
 }
