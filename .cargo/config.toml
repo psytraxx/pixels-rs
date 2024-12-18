@@ -4,6 +4,7 @@ runner = "probe-rs run --chip=esp32s3"
 [env]
 DEFMT_LOG = "info"
 ESP_WIFI_COUNTRY_CODE = "DE"
+ESP_HAL_PLACE_SPI_DRIVER_IN_RAM = "true"
 
 [build]
 rustflags = ["-C", "link-arg=-nostartfiles"]
