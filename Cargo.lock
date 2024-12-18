@@ -220,32 +220,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embassy-executor"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f64f84599b0f4296b92a4b6ac2109bc02340094bda47b9766c5f9ec6a318ebf8"
-dependencies = [
- "critical-section",
- "defmt",
- "document-features",
- "embassy-executor-macros",
- "embassy-time-driver",
- "embassy-time-queue-driver",
-]
-
-[[package]]
-name = "embassy-executor-macros"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3577b1e9446f61381179a330fc5324b01d511624c55f25e3c66c9e3c626dbecf"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "embassy-futures"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -290,7 +264,6 @@ checksum = "158080d48f824fad101d7b2fae2d83ac39e3f7a6fa01811034f7ab8ffc6e7309"
 dependencies = [
  "cfg-if",
  "critical-section",
- "defmt",
  "document-features",
  "embassy-time-driver",
  "embassy-time-queue-driver",
@@ -594,26 +567,6 @@ dependencies = [
  "void",
  "xtensa-lx",
  "xtensa-lx-rt",
-]
-
-[[package]]
-name = "esp-hal-embassy"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7d0f2537ea2ff9bea26a1c8bfe43ad580d4c89febf27189653a9cf95f1f7961"
-dependencies = [
- "critical-section",
- "defmt",
- "document-features",
- "embassy-executor",
- "embassy-time-driver",
- "esp-build",
- "esp-config",
- "esp-hal",
- "esp-hal-procmacros",
- "esp-metadata",
- "portable-atomic",
- "static_cell",
 ]
 
 [[package]]
@@ -995,15 +948,12 @@ dependencies = [
  "defmt-rtt",
  "display-interface",
  "display-interface-parallel-gpio",
- "embassy-executor",
- "embassy-time",
  "embedded-graphics",
  "embedded-graphics-framebuf",
  "embedded-hal 1.0.0",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
- "esp-hal-embassy",
  "heapless",
  "micromath",
  "mipidsi",
@@ -1184,15 +1134,6 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
-
-[[package]]
-name = "static_cell"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d89b0684884a883431282db1e4343f34afc2ff6996fe1f4a1664519b66e14c1e"
-dependencies = [
- "portable-atomic",
-]
 
 [[package]]
 name = "strsim"

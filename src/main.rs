@@ -5,17 +5,14 @@
 use alloc::format;
 use config::DISPLAY_HEIGHT;
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use embassy_executor::Spawner;
-use embassy_time::Instant;
 use embedded_graphics::prelude::Point;
 use esp_alloc::heap_allocator;
-use esp_hal::clock::CpuClock;
-use esp_hal_embassy::main;
-use heapless::Vec;
-use micromath::{
-    vector::{F32x3, I32x2},
-    Quaternion,
+use esp_hal::{
+    clock::CpuClock,
+    entry,
+    time::{self},
 };
+use micromath::{vector::F32x3, Quaternion};
 use {defmt_rtt as _, esp_backtrace as _};
 
 extern crate alloc;
@@ -28,8 +25,8 @@ const FOV: f32 = 150.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
-#[main]
-async fn main(_spawner: Spawner) {
+#[entry]
+fn main() -> ! {
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::Clock240MHz;
@@ -94,7 +91,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         // FPS calculation and display
-        let current_time = Instant::now().as_millis();
+        let current_time = time::now().ticks();
 
         /* // Update rotation based on keyboard input
         if window.is_key_down(Key::Left) {
@@ -121,24 +118,23 @@ async fn main(_spawner: Spawner) {
         rotation = q * rotation;
 
         // Transform and project vertices
-        let transformed_vertices: Vec<I32x2, 8> = cube_vertices
-            .iter()
-            .map(|&v| {
-                let rotated = rotation.rotate(v);
-                let x = rotated.x;
-                let y = rotated.y;
-                let z = rotated.z + PROJECTION_DISTANCE;
+        let mut transformed_vertices = [(0i32, 0i32); 8]; // Fixed size array
 
-                let px = ((x * FOV) / z) as i32 + half_width;
-                let py = ((y * FOV) / z) as i32 + half_height;
-                I32x2::from((px, py))
-            })
-            .collect();
+        for (i, &v) in cube_vertices.iter().enumerate() {
+            let rotated = rotation.rotate(v);
+            let x = rotated.x;
+            let y = rotated.y;
+            let z = rotated.z + PROJECTION_DISTANCE;
+
+            let px = ((x * FOV) / z) as i32 + half_width;
+            let py = ((y * FOV) / z) as i32 + half_height;
+            transformed_vertices[i] = (px, py);
+        }
 
         // Draw edges
         for &(start, end) in &edges {
-            let begin = Point::new(transformed_vertices[start].x, transformed_vertices[start].y);
-            let end = Point::new(transformed_vertices[end].x, transformed_vertices[end].y);
+            let begin = Point::new(transformed_vertices[start].0, transformed_vertices[start].1);
+            let end = Point::new(transformed_vertices[end].0, transformed_vertices[end].1);
             display.draw_line(begin, end).expect("Draw line failed");
         }
 

@@ -10,6 +10,7 @@ use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
+use esp_hal::delay::Delay;
 use esp_hal::gpio::{GpioPin, Level, Output};
 use mipidsi::error::InitError;
 use mipidsi::models::ST7789;
@@ -125,13 +126,15 @@ impl<'a> Display<'a> {
 
         let di = PGPIO8BitInterface::new(bus, dc, wr);
 
+        let mut delay = Delay::new();
+
         let display = Builder::new(mipidsi::models::ST7789, di)
             .display_size(DISPLAY_HEIGHT, DISPLAY_WIDTH)
             .display_offset((240 - DISPLAY_HEIGHT) / 2, 0)
             .orientation(Orientation::new().rotate(Rotation::Deg270))
             .invert_colors(ColorInversion::Inverted)
             .reset_pin(rst)
-            .init(&mut embassy_time::Delay)?;
+            .init(&mut delay)?;
 
         backlight.set_high();
         let data = [Rgb565::BLACK; LCD_PIXELS];
