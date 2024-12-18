@@ -10,7 +10,7 @@ esp-backtrace = { version = "0.14.1", features = [
     "panic-handler",
     "defmt",
 ] }
-esp-hal = { version = "0.22.0", features = ["esp32s3", "defmt"] }
+esp-hal = { version = "0.22.0", features = ["esp32s3", "defmt", "octal-psram"] }
 esp-alloc = { version = "0.5.0" }
 heapless = { version = "0.8.0", default-features = false, features = [
     "defmt-03",

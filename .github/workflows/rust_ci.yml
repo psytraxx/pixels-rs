@@ -2,10 +2,13 @@ name: Continuous Integration
 
 on:
   push:
-    paths-ignore:
-      - "**/README.md"
+    branches: [main]
   pull_request:
-  workflow_dispatch:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,13 +18,6 @@ jobs:
   rust-checks:
     name: Rust Checks
     runs-on: ubuntu-latest
-    env:
-      MQTT_HOSTNAME: test.mosquitto.org
-      MQTT_USERNAME: username
-      MQTT_PASSWORD: password 
-      MQTT_PORT: 1883
-      WIFI_SSID: ssid
-      WIFI_PSK: password
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,7 +25,8 @@ jobs:
         uses: esp-rs/xtensa-toolchain@v1.5
         with:
           default: true
-          buildtargets: esp32
+          buildtargets: esp32s3
+          version: "1.82.0.3"
           ldproxy: false
       - name: Enable caching
         uses: Swatinem/rust-cache@v2

@@ -2,16 +2,13 @@
 #![no_main]
 #![feature(generic_arg_infer)]
 
-use alloc::format;
 use config::DISPLAY_HEIGHT;
+use core::fmt::Write;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embedded_graphics::prelude::Point;
-use esp_alloc::heap_allocator;
-use esp_hal::{
-    clock::CpuClock,
-    entry,
-    time::{self},
-};
+use esp_alloc::{heap_allocator, psram_allocator};
+use esp_hal::{clock::CpuClock, entry, time};
+use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 use {defmt_rtt as _, esp_backtrace as _};
 
@@ -51,6 +48,8 @@ fn main() -> ! {
         d6: peripherals.GPIO47,
         d7: peripherals.GPIO48,
     };
+
+    psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
     let mut display = Display::new(display_peripherals).expect("Display init failed");
 
@@ -140,7 +139,8 @@ fn main() -> ! {
 
         let ms_per_frame = current_time - last_time;
         if (ms_per_frame) > 0 {
-            let text = format!("FPS: {}", 1000 / ms_per_frame);
+            let mut text = String::<16>::new();
+            write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
             display
                 .write(&text, Point::new(0, 0))
                 .expect("Write text failed");
