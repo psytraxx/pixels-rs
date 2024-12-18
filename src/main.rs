@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(generic_arg_infer)]
 
-use config::DISPLAY_HEIGHT;
+use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::fmt::Write;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embedded_graphics::prelude::Point;
@@ -83,14 +83,14 @@ fn main() -> ! {
 
     let mut rotation = Quaternion::IDENTITY;
     let mut last_time = 0;
-    let half_width = (DISPLAY_HEIGHT / 2) as i32;
+    let half_width = (DISPLAY_WIDTH / 2) as i32;
     let half_height = (DISPLAY_HEIGHT / 2) as i32;
 
     //while window.is_open() && !window.is_key_down(Key::Escape) {
 
     loop {
         // FPS calculation and display
-        let current_time = time::now().ticks();
+        let current_time = time::now().duration_since_epoch().to_millis();
 
         /* // Update rotation based on keyboard input
         if window.is_key_down(Key::Left) {

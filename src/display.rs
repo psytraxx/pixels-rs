@@ -153,19 +153,19 @@ impl<'a> DisplayTrait for Display<'a> {
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Error> {
         Line::new(start, end)
-            .into_styled(PrimitiveStyle::with_stroke(RgbColor::GREEN, 2))
+            .into_styled(PrimitiveStyle::with_stroke(RgbColor::WHITE, 1))
             .draw(&mut self.framebuf)?;
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Error> {
+        //self.display.draw_iter(self.framebuf.into_iter())?;
+        let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
+        self.display
+            .set_pixels(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, pixel_iterator)?;
+
         // Clear the frame buffer
         self.framebuf.clear(RgbColor::BLACK)?;
-
-        self.display.draw_iter(self.framebuf.into_iter())?;
-        //let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
-        //self.display.set_pixels(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, pixel_iterator)?;
-
         Ok(())
     }
 }
