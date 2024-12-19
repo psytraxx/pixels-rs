@@ -10,20 +10,37 @@ esp-backtrace = { version = "0.14.1", features = [
     "panic-handler",
     "defmt",
 ] }
+embassy-sync = { version = "0.6.1", features = ["defmt"] }
 esp-hal = { version = "0.22.0", features = ["esp32s3", "defmt", "octal-psram"] }
 esp-alloc = { version = "0.5.0" }
 heapless = { version = "0.8.0", default-features = false, features = [
     "defmt-03",
 ] }
+embassy-time = { version = "0.3.1", features = ["defmt"] }
 defmt = "0.3.8"
 defmt-rtt = "0.4.1"
 mipidsi = "0.8.0"
-display-interface-parallel-gpio = "0.7.0"
+embedded-graphics-core = { version = "0.4.0", features = ["defmt"] }
+display-interface-spi = "0.5.0"
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
+embedded-hal-bus = { version = "0.2.0", features = ["defmt-03"] }
+embassy-embedded-hal = { version = "0.2.0", default-features = false, features = [
+    "defmt",
+] }
+embassy-executor = { version = "0.6.0", features = [
+    "task-arena-size-163840",
+    "defmt",
+] }
+esp-hal-embassy = { version = "0.5.0", features = [
+    "esp32s3",
+    "defmt",
+    "integrated-timers",
+] }
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 embedded-graphics-framebuf = "0.5.0"
 display-interface = { version = "0.5.0", features = ["defmt-03"] }
+static_cell = "2.1.0"
 
 [profile.dev]
 # Rust debug is too slow.
