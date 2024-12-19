@@ -1,0 +1,20 @@
+[target.xtensa-esp32s3-none-elf]
+runner = "probe-rs run --chip=esp32s3"
+
+[env]
+DEFMT_LOG = "info"
+ESP_WIFI_COUNTRY_CODE = "DE"
+ESP_HAL_PLACE_SPI_DRIVER_IN_RAM = "true"
+
+[build]
+rustflags = ["-C", "link-arg=-nostartfiles"]
+
+target = "xtensa-esp32s3-none-elf"
+
+[unstable]
+build-std = ["alloc", "core"]
+
+[flash]
+mode = "qio"
+size = "16MB"
+frequency = "80MHz"
