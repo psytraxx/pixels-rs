@@ -16,7 +16,7 @@ use embedded_graphics_framebuf::FrameBuf;
 use esp_display_interface_spi_dma::display_interface_spi_dma::{self, SPIInterface};
 use esp_hal::delay::Delay;
 use esp_hal::dma::{Dma, DmaPriority};
-use esp_hal::gpio::{GpioPin, Input, Level, Output};
+use esp_hal::gpio::{GpioPin, Input, Level, Output, Pull};
 use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::prelude::*;
 use esp_hal::spi::master::{Config, Spi};
@@ -36,6 +36,7 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<SPIInterface<'static>, RM67162, Ou
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
     framebuf: FrameBuf<Rgb565, DisplayBuffer>,
+    te_pin: Input<'a>,
 }
 
 /// Display interface trait for ST7789 LCD controller
@@ -92,7 +93,7 @@ impl<'a> Display<'a> {
         let mosi = Output::new(p.mosi, Level::Low);
         let cs = Output::new(p.cs, Level::High);
 
-        let _te = Input::new(p.te, esp_hal::gpio::Pull::Down);
+        let te_pin = Input::new(p.te, Pull::None);
 
         let mut pmicen = Output::new_typed(p.pmicen, Level::Low);
         pmicen.set_high();
@@ -140,7 +141,11 @@ impl<'a> Display<'a> {
         let framebuf: FrameBuf<Rgb565, [Rgb565; _]> =
             FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
 
-        Ok(Self { display, framebuf })
+        Ok(Self {
+            display,
+            framebuf,
+            te_pin,
+        })
     }
 }
 
@@ -159,6 +164,9 @@ impl<'a> DisplayTrait for Display<'a> {
 
     fn update_with_buffer(&mut self) -> Result<(), Error> {
         let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
+
+        while !self.te_pin.is_high() {}
+
         self.display
             .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
 
