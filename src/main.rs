@@ -44,6 +44,7 @@ async fn main(_spawner: Spawner) -> ! {
         te: peripherals.GPIO9,
         pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
+        dma_channel: peripherals.DMA,
     };
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

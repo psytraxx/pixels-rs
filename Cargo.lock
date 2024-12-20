@@ -564,6 +564,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "esp-display-interface-spi-dma"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d66c871ce0dd5ad71bede8ad3266d616571280f7c4446bdcec962d733a14cc6f"
+dependencies = [
+ "byte-slice-cast",
+ "display-interface",
+ "display-interface-spi",
+ "embedded-dma",
+ "embedded-graphics",
+ "embedded-hal 1.0.0",
+ "esp-hal",
+ "num-traits",
+]
+
+[[package]]
 name = "esp-hal"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1017,7 +1033,6 @@ dependencies = [
  "defmt",
  "defmt-rtt",
  "display-interface",
- "display-interface-spi",
  "embassy-embedded-hal",
  "embassy-executor",
  "embassy-sync 0.6.1",
@@ -1029,12 +1044,12 @@ dependencies = [
  "embedded-hal-bus",
  "esp-alloc",
  "esp-backtrace",
+ "esp-display-interface-spi-dma",
  "esp-hal",
  "esp-hal-embassy",
  "heapless",
  "micromath",
  "mipidsi",
- "static_cell",
 ]
 
 [[package]]

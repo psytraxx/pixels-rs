@@ -1,13 +1,8 @@
 use crate::rm67162::RM67162;
 
-use core::cell::RefCell;
 use core::convert::Infallible;
 use defmt::info;
 use display_interface::DisplayError;
-use display_interface_spi::SPIInterface;
-use embassy_embedded_hal::shared_bus::blocking::spi::SpiDevice;
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_sync::blocking_mutex::NoopMutex;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
@@ -18,29 +13,25 @@ use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
+use esp_display_interface_spi_dma::display_interface_spi_dma::{self, SPIInterface};
 use esp_hal::delay::Delay;
+use esp_hal::dma::{Dma, DmaPriority};
 use esp_hal::gpio::{GpioPin, Input, Level, Output};
-use esp_hal::peripherals::SPI2;
+use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::prelude::*;
 use esp_hal::spi::master::{Config, Spi};
 use esp_hal::spi::SpiMode;
-use esp_hal::Blocking;
 use mipidsi::error::InitError;
 use mipidsi::options::Orientation;
 use mipidsi::{Builder, Display as MipiDisplay};
-use static_cell::StaticCell;
 
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
-static DISP_SPI_BUS: StaticCell<NoopMutex<RefCell<Spi<'static, Blocking>>>> = StaticCell::new();
 type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
-pub type MySpiDevice<'a> = SpiDevice<'a, NoopRawMutex, Spi<'a, Blocking>, Output<'a>>;
-
-pub type MipiDisplayWrapper<'a> =
-    MipiDisplay<SPIInterface<MySpiDevice<'static>, Output<'a>>, RM67162, Output<'a>>;
+pub type MipiDisplayWrapper<'a> = MipiDisplay<SPIInterface<'static>, RM67162, Output<'a>>;
 
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
@@ -91,6 +82,7 @@ pub struct DisplayPeripherals {
     pub dc: GpioPin<7>,
     pub rst: GpioPin<17>,
     pub spi: SPI2,
+    pub dma_channel: DMA,
 }
 
 impl<'a> Display<'a> {
@@ -106,25 +98,31 @@ impl<'a> Display<'a> {
         pmicen.set_high();
         info!("PMICEN set high");
 
+        let dma = Dma::new(p.dma_channel);
+        let dma_channel = dma.channel0;
+
         // Configure SPI
-        let spi = Spi::new_with_config(
+        let spi_bus = Spi::new_with_config(
             p.spi,
             Config {
-                frequency: 40.MHz(), //TODO: 40MHz
+                frequency: 80.MHz(),
                 mode: SpiMode::Mode0,
                 ..Config::default()
             },
         )
         .with_sck(sck)
-        .with_mosi(mosi);
+        .with_mosi(mosi)
+        .with_cs(cs)
+        .with_dma(dma_channel.configure(false, DmaPriority::Priority0));
 
-        let spi_bus = NoopMutex::new(RefCell::new(spi));
-        let spi_bus = DISP_SPI_BUS.init(spi_bus);
         let dc_pin = p.dc;
         let rst_pin = p.rst;
 
-        let spi = SpiDevice::new(spi_bus, cs);
-        let di = SPIInterface::new(spi, Output::new(dc_pin, Level::Low));
+        let di = display_interface_spi_dma::new_no_cs(
+            LCD_PIXELS,
+            spi_bus,
+            Output::new(dc_pin, Level::Low),
+        );
 
         let mut delay = Delay::new();
 
