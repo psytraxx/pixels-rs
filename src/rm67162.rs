@@ -101,7 +101,7 @@ const RM67162_MADCTL_MV: i32 = 0x20;
 //const RM67162_MADCTL_ML: i32 = 0x10;
 const RM67162_MADCTL_RGB: i32 = 0x00;
 //const RM67162_MADCTL_MH: i32 = 0x04;
-//const RM67162_MADCTL_BGR: i32 = 0x08;
+const RM67162_MADCTL_BGR: i32 = 0x08;
 const LCD_CMD_MADCTL: u8 = 0x36; // Memory data access control
 
 // AMOLED initialization commands
@@ -281,10 +281,14 @@ impl Model for RM67162 {
 }
 
 fn madctl_from_options(options: &ModelOptions) -> i32 {
+    let color_order = match options.color_order {
+        mipidsi::options::ColorOrder::Rgb => RM67162_MADCTL_RGB,
+        mipidsi::options::ColorOrder::Bgr => RM67162_MADCTL_BGR,
+    };
     match options.orientation.rotation {
-        Rotation::Deg0 => RM67162_MADCTL_RGB, //ok
-        Rotation::Deg180 => RM67162_MADCTL_MX | RM67162_MADCTL_MY | RM67162_MADCTL_RGB,
-        Rotation::Deg270 => RM67162_MADCTL_MX | RM67162_MADCTL_MV | RM67162_MADCTL_RGB,
-        Rotation::Deg90 => RM67162_MADCTL_MV | RM67162_MADCTL_MY | RM67162_MADCTL_RGB,
+        Rotation::Deg0 => color_order, //ok
+        Rotation::Deg180 => RM67162_MADCTL_MX | RM67162_MADCTL_MY | color_order,
+        Rotation::Deg270 => RM67162_MADCTL_MX | RM67162_MADCTL_MV | color_order,
+        Rotation::Deg90 => RM67162_MADCTL_MV | RM67162_MADCTL_MY | color_order,
     }
 }
