@@ -8,8 +8,8 @@ use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
-use embedded_graphics::prelude::Primitive;
-use embedded_graphics::primitives::{Line, PrimitiveStyle};
+use embedded_graphics::prelude::{Primitive, Size};
+use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
@@ -127,7 +127,10 @@ impl<'a> Display<'a> {
         let mut delay = Delay::new();
 
         let display = Builder::new(RM67162, di)
-            .orientation(Orientation::default())
+            .orientation(Orientation {
+                mirrored: false,
+                rotation: mipidsi::options::Rotation::Deg90,
+            })
             .display_size(DISPLAY_WIDTH, DISPLAY_HEIGHT)
             .reset_pin(Output::new(rst_pin, Level::High))
             .init(&mut delay)
@@ -155,7 +158,13 @@ impl<'a> DisplayTrait for Display<'a> {
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Error> {
-        //self.display.draw_iter(self.framebuf.into_iter())?;
+        /* self.display.fill_contiguous(
+            &Rectangle::new(
+                Point::zero(),
+                Size::new(DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32),
+            ),
+            self.framebuf.into_iter().map(|p| p.1),
+        )?; */
         let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
         self.display
             .set_pixels(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT, pixel_iterator)?;
