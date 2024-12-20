@@ -21,7 +21,7 @@ mod display;
 mod rm67162;
 
 // Cube and projection constants
-const FOV: f32 = 150.0; // Field of View
+const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
