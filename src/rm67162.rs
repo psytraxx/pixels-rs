@@ -7,8 +7,86 @@ use mipidsi::{
     dcs::{Dcs, SetAddressMode, SoftReset, WriteMemoryStart},
     error::{Error, InitError},
     models::Model,
-    options::ModelOptions,
+    options::{ModelOptions, Rotation},
 };
+
+use crate::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
+
+//https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/8c72b786373fbaef46ce35a6db924d6e16a0c3ec/src/LilyGo_AMOLED.cpp#L806
+
+/*static const  BoardsConfigure_t BOARD_AMOLED_191_SPI = {
+    // RM67162 Driver
+    RM67162_AMOLED_SPI,
+    &AMOLED_191_TOUCH_PINS,     //Touch CST816T
+    &AMOLED_191_SPI_PMU_PINS,   //PMU
+    NULL,                       //SENSOR
+    &AMOLED_191_SPI_SD_PINS,    //SDCard
+    AMOLED_191_BUTTONTS,        //Button Pins
+    1, //Button Number
+    -1,//pixelsPins
+    4, //adcPins
+    38,//PMICEnPins
+    false,//framebuffer
+}; */
+
+/*// LILYGO 1.91 Inch AMOLED(RM67162) S3R8
+// https://www.lilygo.cc/products/t-display-s3-amoled
+static const DisplayConfigure_t RM67162_AMOLED_SPI  = {
+    18,//BOARD_DISP_DATA0,          //MOSI
+    7,//BOARD_DISP_DATA1,           //DC
+    -1,//BOARD_DISP_DATA2,
+    -1,//BOARD_DISP_DATA3,
+    47,//BOARD_DISP_SCK,            //SCK
+    6,//BOARD_DISP_CS,              //CS
+    BOARD_NONE_PIN,//DC
+    17,//BOARD_DISP_RESET,          //RST
+    9, //BOARD_DISP_TE,
+    8, //command bit
+    24,//address bit
+    40000000,
+    (lcd_cmd_t *)rm67162_spi_cmd,
+    RM67162_INIT_SPI_SEQUENCE_LENGTH,
+    RM67162_WIDTH,//width
+    RM67162_HEIGHT,//height
+    0,//frameBufferSize
+    false //fullRefresh
+}; */
+
+/*typedef struct __DisplayConfigure {
+    int d0;
+    int d1;
+    int d2;
+    int d3;
+    int sck;
+    int cs;
+    int dc;
+    int rst;
+    int te;
+    uint8_t cmdBit;
+    uint8_t addBit;
+    int  freq;
+    lcd_cmd_t *initSequence;
+    uint32_t initSize;
+    uint16_t width;
+    uint16_t height;
+    uint32_t frameBufferSize;
+    bool fullRefresh;
+} DisplayConfigure_t; */
+
+/*static const  BoardsConfigure_t BOARD_AMOLED_191_SPI = {
+    // RM67162 Driver
+    RM67162_AMOLED_SPI,
+    &AMOLED_191_TOUCH_PINS,     //Touch CST816T
+    &AMOLED_191_SPI_PMU_PINS,   //PMU
+    NULL,                       //SENSOR
+    &AMOLED_191_SPI_SD_PINS,    //SDCard
+    AMOLED_191_BUTTONTS,        //Button Pins
+    1, //Button Number
+    -1,//pixelsPins
+    4, //adcPins
+    38,//PMICEnPins
+    false,//framebuffer
+}; */
 
 // Define a structure for the LCD command
 struct LcdCommand<'a> {
@@ -16,6 +94,15 @@ struct LcdCommand<'a> {
     params: &'a [u8],         // Command parameters
     delay_after: Option<u32>, // Delay in milliseconds after sending the command
 }
+
+const RM67162_MADCTL_MY: i32 = 0x80;
+const RM67162_MADCTL_MX: i32 = 0x40;
+const RM67162_MADCTL_MV: i32 = 0x20;
+//const RM67162_MADCTL_ML: i32 = 0x10;
+const RM67162_MADCTL_RGB: i32 = 0x00;
+//const RM67162_MADCTL_MH: i32 = 0x04;
+//const RM67162_MADCTL_BGR: i32 = 0x08;
+const LCD_CMD_MADCTL: u8 = 0x36; // Memory data access control
 
 // AMOLED initialization commands
 const AMOLED_INIT_CMDS: &[LcdCommand] = &[
@@ -99,7 +186,7 @@ const AMOLED_INIT_CMDS: &[LcdCommand] = &[
         addr: 0x51,
         params: &[0xff],
         delay_after: None,
-    }, // Set brightness (255 in decimal)
+    }, // Set brightness (175 in decimal)
     LcdCommand {
         addr: 0x53,
         params: &[0x20],
@@ -137,7 +224,7 @@ pub struct RM67162;
 
 impl Model for RM67162 {
     type ColorFormat = Rgb565;
-    const FRAMEBUFFER_SIZE: (u16, u16) = (240, 536);
+    const FRAMEBUFFER_SIZE: (u16, u16) = (DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
     fn init<RST, DELAY, DI>(
         &mut self,
@@ -171,6 +258,9 @@ impl Model for RM67162 {
             }
         }
 
+        let test = madctl_from_options(options);
+        dcs.write_raw(LCD_CMD_MADCTL, &[test as u8]).unwrap();
+
         info!("Display initialized");
         Ok(madctl)
     }
@@ -187,5 +277,14 @@ impl Model for RM67162 {
         let buf = DataFormat::U16BEIter(&mut iter);
         dcs.di.send_data(buf)?;
         Ok(())
+    }
+}
+
+fn madctl_from_options(options: &ModelOptions) -> i32 {
+    match options.orientation.rotation {
+        Rotation::Deg0 => RM67162_MADCTL_RGB, //ok
+        Rotation::Deg180 => RM67162_MADCTL_MX | RM67162_MADCTL_MY | RM67162_MADCTL_RGB,
+        Rotation::Deg270 => RM67162_MADCTL_MX | RM67162_MADCTL_MV | RM67162_MADCTL_RGB,
+        Rotation::Deg90 => RM67162_MADCTL_MV | RM67162_MADCTL_MY | RM67162_MADCTL_RGB,
     }
 }
