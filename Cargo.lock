@@ -216,7 +216,6 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5794414bc20e0d750f145bc0e82366b19dd078e9e075e8331fb8dd069a1cb6a2"
 dependencies = [
- "defmt",
  "embassy-futures",
  "embassy-sync 0.6.1",
  "embassy-time",
@@ -1033,7 +1032,6 @@ dependencies = [
  "defmt",
  "defmt-rtt",
  "display-interface",
- "embassy-embedded-hal",
  "embassy-executor",
  "embassy-sync 0.6.1",
  "embassy-time",
