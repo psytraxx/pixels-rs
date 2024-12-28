@@ -5,9 +5,11 @@
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::fmt::Write;
 use display::{Display, DisplayPeripherals, DisplayTrait};
+use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
 use esp_alloc::{heap_allocator, psram_allocator};
-use esp_hal::{clock::CpuClock, entry, time};
+use esp_hal::{clock::CpuClock, time, timer::timg::TimerGroup};
+use esp_hal_embassy::main;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 use {defmt_rtt as _, esp_backtrace as _};
@@ -16,14 +18,15 @@ extern crate alloc;
 
 mod config;
 mod display;
+mod rm67162;
 
 // Cube and projection constants
-const FOV: f32 = 150.0; // Field of View
+const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(_spawner: Spawner) -> ! {
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::Clock240MHz;
@@ -33,21 +36,20 @@ fn main() -> ! {
     heap_allocator!(72 * 1024);
 
     let display_peripherals = DisplayPeripherals {
-        backlight: peripherals.GPIO38,
+        sck: peripherals.GPIO47,
+        mosi: peripherals.GPIO18,
         cs: peripherals.GPIO6,
         dc: peripherals.GPIO7,
-        rst: peripherals.GPIO5,
-        wr: peripherals.GPIO8,
-        rd: peripherals.GPIO9,
-        d0: peripherals.GPIO39,
-        d1: peripherals.GPIO40,
-        d2: peripherals.GPIO41,
-        d3: peripherals.GPIO42,
-        d4: peripherals.GPIO45,
-        d5: peripherals.GPIO46,
-        d6: peripherals.GPIO47,
-        d7: peripherals.GPIO48,
+        rst: peripherals.GPIO17,
+        te: peripherals.GPIO9,
+        pmicen: peripherals.GPIO38,
+        spi: peripherals.SPI2,
+        dma_channel: peripherals.DMA,
     };
+
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+
+    esp_hal_embassy::init(timg0.timer0);
 
     psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
