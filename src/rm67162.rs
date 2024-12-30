@@ -14,21 +14,6 @@ use crate::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 //https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/8c72b786373fbaef46ce35a6db924d6e16a0c3ec/src/LilyGo_AMOLED.cpp#L806
 
-/*static const  BoardsConfigure_t BOARD_AMOLED_191_SPI = {
-    // RM67162 Driver
-    RM67162_AMOLED_SPI,
-    &AMOLED_191_TOUCH_PINS,     //Touch CST816T
-    &AMOLED_191_SPI_PMU_PINS,   //PMU
-    NULL,                       //SENSOR
-    &AMOLED_191_SPI_SD_PINS,    //SDCard
-    AMOLED_191_BUTTONTS,        //Button Pins
-    1, //Button Number
-    -1,//pixelsPins
-    4, //adcPins
-    38,//PMICEnPins
-    false,//framebuffer
-}; */
-
 /*// LILYGO 1.91 Inch AMOLED(RM67162) S3R8
 // https://www.lilygo.cc/products/t-display-s3-amoled
 static const DisplayConfigure_t RM67162_AMOLED_SPI  = {
