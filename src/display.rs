@@ -119,11 +119,8 @@ impl<'a> Display<'a> {
         let dc_pin = p.dc;
         let rst_pin = p.rst;
 
-        let di = display_interface_spi_dma::new_no_cs(
-            LCD_PIXELS,
-            spi_bus,
-            Output::new(dc_pin, Level::Low),
-        );
+        let di =
+            display_interface_spi_dma::new_no_cs(512, spi_bus, Output::new(dc_pin, Level::Low));
 
         let mut delay = Delay::new();
 

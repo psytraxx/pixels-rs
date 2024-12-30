@@ -1,6 +1,6 @@
 use defmt::info;
 use display_interface::{DataFormat, WriteOnlyDataCommand};
-use embedded_graphics_core::{pixelcolor::Rgb565, prelude::IntoStorage};
+use embedded_graphics::{pixelcolor::Rgb565, prelude::IntoStorage};
 use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::OutputPin;
 use mipidsi::{
