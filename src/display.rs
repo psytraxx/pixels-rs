@@ -1,3 +1,4 @@
+use crate::dma::SPIInterface;
 use crate::rm67162::RM67162;
 
 use core::convert::Infallible;
@@ -14,8 +15,9 @@ use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
 use esp_hal::delay::Delay;
+use esp_hal::dma::Dma;
 use esp_hal::gpio::{GpioPin, Level, Output};
-use esp_hal::peripherals::SPI2;
+use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::prelude::*;
 use esp_hal::spi::master::{Config, Spi};
 use mipidsi::error::InitError;
@@ -28,18 +30,7 @@ const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHIT
 pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
 type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
-pub type MipiDisplayWrapper<'a> = MipiDisplay<
-    display_interface_spi::SPIInterface<
-        embedded_hal_bus::spi::ExclusiveDevice<
-            Spi<'a, esp_hal::Blocking>,
-            Output<'a>,
-            embedded_hal_bus::spi::NoDelay,
-        >,
-        Output<'a>,
-    >,
-    RM67162,
-    Output<'a>,
->;
+pub type MipiDisplayWrapper<'a> = MipiDisplay<SPIInterface<'a>, RM67162, Output<'a>>;
 
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
@@ -89,6 +80,7 @@ pub struct DisplayPeripherals {
     pub dc: GpioPin<7>,
     pub rst: GpioPin<17>,
     pub spi: SPI2,
+    pub dma: DMA,
 }
 
 impl<'a> Display<'a> {
@@ -102,23 +94,27 @@ impl<'a> Display<'a> {
         pmicen.set_high();
         info!("PMICEN set high");
 
+        let dma = Dma::new(p.dma);
+
         // Configure SPI
         let spi_bus = Spi::new_with_config(
             p.spi,
             Config {
-                frequency: 80.MHz(),
+                frequency: 75.MHz(),
                 ..Config::default()
             },
         )
         .with_sck(sck)
-        .with_mosi(mosi);
+        .with_mosi(mosi)
+        .with_dma(
+            dma.channel0
+                .configure(false, esp_hal::dma::DmaPriority::Priority0),
+        );
 
         let dc_pin = p.dc;
         let rst_pin = p.rst;
 
-        let spi_bus = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi_bus, cs).unwrap();
-
-        let di = display_interface_spi::SPIInterface::new(spi_bus, Output::new(dc_pin, Level::Low));
+        let di = SPIInterface::new(LCD_PIXELS, spi_bus, Output::new(dc_pin, Level::Low), cs);
 
         let mut delay = Delay::new();
 

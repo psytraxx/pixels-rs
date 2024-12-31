@@ -12,6 +12,7 @@ use mipidsi::{
 
 use crate::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
+//https://forum.lvgl.io/t/periodic-wrong-pixels-using-dma-spi-esp32/9049/6
 //https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/8c72b786373fbaef46ce35a6db924d6e16a0c3ec/src/LilyGo_AMOLED.cpp#L806
 
 /*// LILYGO 1.91 Inch AMOLED(RM67162) S3R8

@@ -18,6 +18,7 @@ extern crate alloc;
 
 mod config;
 mod display;
+mod dma;
 mod rm67162;
 
 // Cube and projection constants
@@ -43,6 +44,7 @@ async fn main(_spawner: Spawner) -> ! {
         rst: peripherals.GPIO17,
         pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
+        dma: peripherals.DMA,
     };
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
