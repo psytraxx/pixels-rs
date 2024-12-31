@@ -8,10 +8,10 @@ use cst816s::CST816S;
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
-use embassy_time::Delay;
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
+use esp_hal::delay::Delay;
 use esp_hal::{
     clock::CpuClock,
     gpio::{Input, NoPin},
@@ -109,7 +109,7 @@ async fn main(_spawner: Spawner) -> ! {
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
 
     let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int, NoPin);
-    let mut delay = Delay;
+    let mut delay = Delay::new();
     touchpad.setup(&mut delay).expect("touchpad setup failed");
 
     let mut is_dragging = false;
