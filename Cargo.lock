@@ -93,6 +93,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
+name = "cst816s"
+version = "1.0.0"
+source = "git+https://github.com/vstepanyuk/cst816s.git?branch=master#1e0cffbf69306548754bbfe6bc3c50441efa5298"
+dependencies = [
+ "embedded-hal 1.0.0",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1009,6 +1017,7 @@ name = "pixels-rs"
 version = "0.1.0"
 dependencies = [
  "byte-slice-cast",
+ "cst816s",
  "defmt",
  "defmt-rtt",
  "display-interface",
