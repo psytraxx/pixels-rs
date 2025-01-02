@@ -1,9 +1,7 @@
-use crate::dma::SPIInterface;
 use crate::rm67162::RM67162;
 
 use core::convert::Infallible;
 use defmt::info;
-use display_interface::DisplayError;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
@@ -14,13 +12,14 @@ use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
+use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::delay::Delay;
-use esp_hal::dma::Dma;
+use esp_hal::dma::{Dma, DmaRxBuf, DmaTxBuf};
 use esp_hal::gpio::{GpioPin, Level, Output};
 use esp_hal::peripherals::{DMA, SPI2};
-use esp_hal::prelude::*;
-use esp_hal::spi::master::{Config, Spi};
-use mipidsi::error::InitError;
+use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
+use esp_hal::{dma_buffers, prelude::*};
+use mipidsi::interface::SpiInterface;
 use mipidsi::options::Orientation;
 use mipidsi::{Builder, Display as MipiDisplay};
 
@@ -30,7 +29,19 @@ const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHIT
 pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
 type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
-pub type MipiDisplayWrapper<'a> = MipiDisplay<SPIInterface<'a>, RM67162, Output<'a>>;
+pub type MipiDisplayWrapper<'a> = MipiDisplay<
+    SpiInterface<
+        'a,
+        ExclusiveDevice<
+            SpiDmaBus<'a, esp_hal::Blocking>,
+            Output<'a>,
+            embedded_hal_bus::spi::NoDelay,
+        >,
+        Output<'a>,
+    >,
+    RM67162,
+    Output<'a>,
+>;
 
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
@@ -84,7 +95,7 @@ pub struct DisplayPeripherals {
 }
 
 impl<'a> Display<'a> {
-    pub fn new(p: DisplayPeripherals) -> Result<Self, Error> {
+    pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, Error> {
         // SPI pins
         let sck = Output::new(p.sck, Level::Low);
         let mosi = Output::new(p.mosi, Level::Low);
@@ -97,7 +108,7 @@ impl<'a> Display<'a> {
         let dma = Dma::new(p.dma);
 
         // Configure SPI
-        let spi_bus = Spi::new_with_config(
+        let spi = Spi::new_with_config(
             p.spi,
             Config {
                 frequency: 75.MHz(),
@@ -113,8 +124,15 @@ impl<'a> Display<'a> {
 
         let dc_pin = p.dc;
         let rst_pin = p.rst;
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+        let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let di = SPIInterface::new(LCD_PIXELS, spi_bus, Output::new(dc_pin, Level::Low), cs);
+        let spi = SpiDmaBus::new(spi, dma_rx_buf, dma_tx_buf);
+
+        let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
+
+        let di = SpiInterface::new(spi_device, Output::new(dc_pin, Level::Low), buffer);
 
         let mut delay = Delay::new();
 
@@ -153,7 +171,8 @@ impl<'a> DisplayTrait for Display<'a> {
         let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
 
         self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
+            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)
+            .map_err(|_| Error::DisplayInterface)?;
 
         // Clear the frame buffer
         self.framebuf.clear(RgbColor::BLACK)?;
@@ -164,21 +183,10 @@ impl<'a> DisplayTrait for Display<'a> {
 /// A clock error
 #[derive(Debug)]
 pub enum Error {
-    DisplayInterface(#[expect(unused, reason = "Never read directly")] DisplayError),
+    DisplayInterface,
     Infallible,
 }
 
-impl From<DisplayError> for Error {
-    fn from(error: DisplayError) -> Self {
-        Self::DisplayInterface(error)
-    }
-}
-
-impl From<InitError<Infallible>> for Error {
-    fn from(_: InitError<Infallible>) -> Self {
-        Self::Infallible
-    }
-}
 impl From<Infallible> for Error {
     fn from(_: Infallible) -> Self {
         Self::Infallible

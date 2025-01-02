@@ -19,7 +19,7 @@ heapless = { version = "0.8.0", default-features = false, features = [
 ] }
 defmt = "0.3.8"
 defmt-rtt = "0.4.1"
-mipidsi = "0.8.0"
+mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
 embassy-executor = { version = "0.6.0", features = [
     "task-arena-size-163840",
@@ -33,7 +33,6 @@ esp-hal-embassy = { version = "0.5.0", features = [
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 embedded-graphics-framebuf = "0.5.0"
-display-interface = { version = "0.5.0", features = ["defmt-03"] }
 embedded-hal-bus = { version = "0.2.0", features = ["defmt-03"] }
 byte-slice-cast = { version = "1.2.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false, features = [

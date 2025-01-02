@@ -28,7 +28,6 @@ extern crate alloc;
 
 mod config;
 mod display;
-mod dma;
 mod rm67162;
 
 // Cube and projection constants
@@ -68,8 +67,8 @@ async fn main(_spawner: Spawner) -> ! {
     esp_hal_embassy::init(timg0.timer0);
 
     psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-
-    let mut display = Display::new(display_peripherals).expect("Display init failed");
+    let mut buffer = [0_u8; 512];
+    let mut display = Display::new(display_peripherals, &mut buffer).expect("Display init failed");
 
     // Define cube vertices
     let cube_vertices: [F32x3; 8] = [

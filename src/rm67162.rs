@@ -1,11 +1,9 @@
 use defmt::info;
-use display_interface::{DataFormat, WriteOnlyDataCommand};
-use embedded_graphics::{pixelcolor::Rgb565, prelude::IntoStorage};
+use embedded_graphics::pixelcolor::Rgb565;
 use embedded_hal::delay::DelayNs;
-use embedded_hal::digital::OutputPin;
 use mipidsi::{
-    dcs::{Dcs, SetAddressMode, SoftReset, WriteMemoryStart},
-    error::{Error, InitError},
+    dcs::{InterfaceExt, SetAddressMode},
+    interface::Interface,
     models::Model,
     options::{ModelOptions, Rotation},
 };
@@ -208,31 +206,24 @@ impl Model for RM67162 {
     type ColorFormat = Rgb565;
     const FRAMEBUFFER_SIZE: (u16, u16) = (DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
-    fn init<RST, DELAY, DI>(
+    fn init<DELAY, DI>(
         &mut self,
-        dcs: &mut Dcs<DI>,
+        di: &mut DI,
         delay: &mut DELAY,
         options: &ModelOptions,
-        rst: &mut Option<RST>,
-    ) -> Result<SetAddressMode, InitError<RST::Error>>
+    ) -> Result<SetAddressMode, DI::Error>
     where
-        RST: OutputPin,
         DELAY: DelayNs,
-        DI: WriteOnlyDataCommand,
+        DI: Interface,
     {
         let madctl = SetAddressMode::from(options);
-
-        match rst {
-            Some(ref mut rst) => self.hard_reset(rst, delay)?,
-            None => dcs.write_command(SoftReset)?,
-        }
 
         delay.delay_us(200_000);
 
         // Send initialization commands
         for cmd in AMOLED_INIT_CMDS {
             // Write the command address
-            dcs.write_raw(cmd.addr, cmd.params).unwrap();
+            di.write_raw(cmd.addr, cmd.params).unwrap();
 
             // Apply delay if specified
             if let Some(ms) = cmd.delay_after {
@@ -241,24 +232,10 @@ impl Model for RM67162 {
         }
 
         let test = madctl_from_options(options);
-        dcs.write_raw(LCD_CMD_MADCTL, &[test as u8]).unwrap();
+        di.write_raw(LCD_CMD_MADCTL, &[test as u8]).unwrap();
 
         info!("Display initialized");
         Ok(madctl)
-    }
-
-    fn write_pixels<DI, I>(&mut self, dcs: &mut Dcs<DI>, colors: I) -> Result<(), Error>
-    where
-        DI: WriteOnlyDataCommand,
-        I: IntoIterator<Item = Self::ColorFormat>,
-    {
-        dcs.write_command(WriteMemoryStart)?;
-
-        let mut iter = colors.into_iter().map(Rgb565::into_storage);
-
-        let buf = DataFormat::U16BEIter(&mut iter);
-        dcs.di.send_data(buf)?;
-        Ok(())
     }
 }
 
