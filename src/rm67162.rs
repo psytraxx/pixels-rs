@@ -2,7 +2,7 @@ use defmt::info;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_hal::delay::DelayNs;
 use mipidsi::{
-    dcs::{InterfaceExt, SetAddressMode},
+    dcs::{ExitSleepMode, InterfaceExt, SetAddressMode, SetDisplayOn},
     interface::Interface,
     models::Model,
     options::{ModelOptions, Rotation},
@@ -10,55 +10,9 @@ use mipidsi::{
 
 use crate::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
-//https://forum.lvgl.io/t/periodic-wrong-pixels-using-dma-spi-esp32/9049/6
-//https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/8c72b786373fbaef46ce35a6db924d6e16a0c3ec/src/LilyGo_AMOLED.cpp#L806
-
-/*// LILYGO 1.91 Inch AMOLED(RM67162) S3R8
+// LILYGO 1.91 Inch AMOLED(RM67162) S3R8
+// https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/8c72b786373fbaef46ce35a6db924d6e16a0c3ec/src/LilyGo_AMOLED.cpp#L806
 // https://www.lilygo.cc/products/t-display-s3-amoled
-static const DisplayConfigure_t RM67162_AMOLED_SPI  = {
-    18,//BOARD_DISP_DATA0,          //MOSI
-    7,//BOARD_DISP_DATA1,           //DC
-    -1,//BOARD_DISP_DATA2,
-    -1,//BOARD_DISP_DATA3,
-    47,//BOARD_DISP_SCK,            //SCK
-    6,//BOARD_DISP_CS,              //CS
-    BOARD_NONE_PIN,//DC
-    17,//BOARD_DISP_RESET,          //RST
-    9, //BOARD_DISP_TE,
-    8, //command bit
-    24,//address bit
-    40000000,
-    (lcd_cmd_t *)rm67162_spi_cmd,
-    RM67162_INIT_SPI_SEQUENCE_LENGTH,
-    RM67162_WIDTH,//width
-    RM67162_HEIGHT,//height
-    0,//frameBufferSize
-    false //fullRefresh
-}; */
-
-/*typedef struct __DisplayConfigure {
-    int d0;
-    int d1;
-    int d2;
-    int d3;
-    int sck;
-    int cs;
-    int dc;
-    int rst;
-    int te;
-    uint8_t cmdBit;
-    uint8_t addBit;
-    int  freq;
-    lcd_cmd_t *initSequence;
-    uint32_t initSize;
-    uint16_t width;
-    uint16_t height;
-    uint32_t frameBufferSize;
-    bool fullRefresh;
-} DisplayConfigure_t; */
-
-/// Commands used to initialize the RM67162 AMOLED display controller
-/// Derived from LilyGo reference implementation
 
 // Define a structure for the LCD command
 struct LcdCommand<'a> {
@@ -66,15 +20,13 @@ struct LcdCommand<'a> {
     addr: u8,
     /// Command parameters
     params: &'a [u8],
-    /// Optional delay after command in milliseconds
-    delay_after: Option<u32>,
 }
 
 /// Memory Access Control (MADCTL) register bits
-const RM67162_MADCTL_MY: i32 = 0x80; // Row address order
-const RM67162_MADCTL_MX: i32 = 0x40; // Column address order
-const RM67162_MADCTL_MV: i32 = 0x20; // Row/Column exchange
-const RM67162_MADCTL_RGB: i32 = 0x00; // RGB color order
+const RM67162_MADCTL_MY: u8 = 0x80; // Row address order
+const RM67162_MADCTL_MX: u8 = 0x40; // Column address order
+const RM67162_MADCTL_MV: u8 = 0x20; // Row/Column exchange
+const RM67162_MADCTL_RGB: u8 = 0x00; // RGB color order
 
 /// Memory Data Access Control register
 const LCD_CMD_MADCTL: u8 = 0x36;
@@ -100,99 +52,80 @@ const AMOLED_INIT_CMDS: &[LcdCommand] = &[
 
         {0x3A, {0x75}, 0x01}, // Interface Pixel Format 16bit/pixel
         {0xC4, {0x80}, 0x01},
-        {0x11, {0x00}, 0x01 | 0x80},
-        {0x29, {0x00}, 0x01 | 0x80},
+        {0x11, {0x00}, 0x01 | 0x80}, // Sleep Out
+        {0x29, {0x00}, 0x01 | 0x80}, // Display ON
     }; */
     LcdCommand {
         addr: 0xFE,
         params: &[0x04],
-        delay_after: None,
     }, // SET APGE3
     LcdCommand {
         addr: 0x6A,
         params: &[0x00],
-        delay_after: None,
     },
     LcdCommand {
         addr: 0xFE,
         params: &[0x05],
-        delay_after: None,
     }, // SET APGE4
     LcdCommand {
         addr: 0xFE,
         params: &[0x07],
-        delay_after: None,
     }, // SET APGE6
     LcdCommand {
         addr: 0x07,
         params: &[0x4F],
-        delay_after: None,
     },
     LcdCommand {
         addr: 0xFE,
         params: &[0x01],
-        delay_after: None,
     }, // SET APGE0
     LcdCommand {
         addr: 0x2A,
         params: &[0x02],
-        delay_after: None,
+        //Set column start address
     },
     LcdCommand {
         addr: 0x2B,
         params: &[0x73],
-        delay_after: None,
+        //Set row start address
     },
     LcdCommand {
         addr: 0xFE,
         params: &[0x0A],
-        delay_after: None,
     }, // SET APGE9
     LcdCommand {
         addr: 0x29,
         params: &[0x10],
-        delay_after: None,
+        // display on
     },
     LcdCommand {
         addr: 0xFE,
         params: &[0x00],
-        delay_after: None,
+        //CMD Mode Switch to User Command Set
     },
     LcdCommand {
         addr: 0x51,
-        params: &[0xff],
-        delay_after: None,
+        params: &[0xaf],
     }, // Set brightness (175 in decimal)
     LcdCommand {
         addr: 0x53,
         params: &[0x20],
-        delay_after: None,
+        //Write CTRL display
     },
     LcdCommand {
         addr: 0x35,
         params: &[0x00],
-        delay_after: None,
+        // set Tearing Effect Line on
     },
     LcdCommand {
         addr: 0x3A,
         params: &[0x75],
-        delay_after: None,
     }, // Interface Pixel Format 16bit/pixel
     LcdCommand {
         addr: 0xC4,
         params: &[0x80],
-        delay_after: None,
+        // set_DSPI Mode to SPI_WRAM
     },
-    LcdCommand {
-        addr: 0x11,
-        params: &[0x00],
-        delay_after: Some(120),
-    }, // Sleep Out with 120ms delay
-    LcdCommand {
-        addr: 0x29,
-        params: &[0x00],
-        delay_after: Some(120),
-    }, // Display ON with 120ms delay
 ];
 
 /// RM67162 AMOLED display driver implementation
@@ -218,21 +151,20 @@ impl Model for RM67162 {
     {
         let madctl = SetAddressMode::from(options);
 
-        delay.delay_us(200_000);
-
         // Send initialization commands
         for cmd in AMOLED_INIT_CMDS {
             // Write the command address
             di.write_raw(cmd.addr, cmd.params).unwrap();
-
-            // Apply delay if specified
-            if let Some(ms) = cmd.delay_after {
-                delay.delay_ms(ms);
-            }
         }
 
-        let test = madctl_from_options(options);
-        di.write_raw(LCD_CMD_MADCTL, &[test as u8]).unwrap();
+        // Manually set memory access control - the default doesn't work
+        let custom_madctl = madctl_from_options(options);
+        di.write_raw(LCD_CMD_MADCTL, &[custom_madctl]).unwrap();
+
+        di.write_command(ExitSleepMode)?; // turn off sleep
+        delay.delay_us(120_000);
+
+        di.write_command(SetDisplayOn)?; // turn on display
 
         info!("Display initialized");
         Ok(madctl)
@@ -240,7 +172,7 @@ impl Model for RM67162 {
 }
 
 /// Configures display orientation based on rotation settings
-fn madctl_from_options(options: &ModelOptions) -> i32 {
+fn madctl_from_options(options: &ModelOptions) -> u8 {
     match options.orientation.rotation {
         Rotation::Deg0 => RM67162_MADCTL_RGB, //ok
         Rotation::Deg180 => RM67162_MADCTL_MX | RM67162_MADCTL_MY | RM67162_MADCTL_RGB,
