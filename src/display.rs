@@ -12,14 +12,15 @@ use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
-use embedded_hal_bus::spi::ExclusiveDevice;
+use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
 use esp_hal::dma::{Dma, DmaRxBuf, DmaTxBuf};
 use esp_hal::gpio::{GpioPin, Level, Output};
 use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
+use esp_hal::spi::Error;
 use esp_hal::{dma_buffers, prelude::*};
-use mipidsi::interface::SpiInterface;
+use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::options::Orientation;
 use mipidsi::{Builder, Display as MipiDisplay};
 
@@ -53,6 +54,9 @@ pub struct Display<'a> {
 /// Provides basic drawing operations for text and primitives.
 /// Implementations should handle the low-level display communication.
 pub trait DisplayTrait {
+    /// Error type
+    type Error: core::fmt::Debug;
+
     /// Writes text to the display at the specified position
     ///
     /// # Arguments
@@ -62,14 +66,14 @@ pub trait DisplayTrait {
     /// # Returns
     /// * `Ok(())` on successful write
     /// * `Err(Error)` if the write operation fails
-    fn write(&mut self, text: &str, position: Point) -> Result<(), Error>;
+    fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error>;
 
     /// Updates the display with the current framebuffer contents
     ///
     /// # Returns
     /// * `Ok(())` on successful update
     /// * `Err(Error)` if the update operation fails
-    fn update_with_buffer(&mut self) -> Result<(), Error>;
+    fn update_with_buffer(&mut self) -> Result<(), Self::Error>;
 
     /// Draws a line between two points
     ///
@@ -80,7 +84,7 @@ pub trait DisplayTrait {
     /// # Returns
     /// * `Ok(())` on successful line draw
     /// * `Err(Error)` if the draw operation fails
-    fn draw_line(&mut self, begin: Point, end: Point) -> Result<(), Error>;
+    fn draw_line(&mut self, begin: Point, end: Point) -> Result<(), Self::Error>;
 }
 
 pub struct DisplayPeripherals {
@@ -95,7 +99,7 @@ pub struct DisplayPeripherals {
 }
 
 impl<'a> Display<'a> {
-    pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, Error> {
+    pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, DisplayError> {
         // SPI pins
         let sck = Output::new(p.sck, Level::Low);
         let mosi = Output::new(p.mosi, Level::Low);
@@ -155,24 +159,25 @@ impl<'a> Display<'a> {
 }
 
 impl<'a> DisplayTrait for Display<'a> {
-    fn write(&mut self, text: &str, position: Point) -> Result<(), Error> {
+    type Error = DisplayError;
+
+    fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
         Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.framebuf)?;
         Ok(())
     }
 
-    fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Error> {
+    fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
         Line::new(start, end)
             .into_styled(PrimitiveStyle::with_stroke(RgbColor::WHITE, 2))
             .draw(&mut self.framebuf)?;
         Ok(())
     }
 
-    fn update_with_buffer(&mut self) -> Result<(), Error> {
+    fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
         let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
 
         self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)
-            .map_err(|_| Error::DisplayInterface)?;
+            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
 
         // Clear the frame buffer
         self.framebuf.clear(RgbColor::BLACK)?;
@@ -180,14 +185,19 @@ impl<'a> DisplayTrait for Display<'a> {
     }
 }
 
-/// A clock error
 #[derive(Debug)]
-pub enum Error {
-    DisplayInterface,
+pub enum DisplayError {
     Infallible,
+    SpiError(#[allow(unused)] SpiError<DeviceError<Error, Infallible>, Infallible>),
 }
 
-impl From<Infallible> for Error {
+impl From<SpiError<DeviceError<Error, Infallible>, Infallible>> for DisplayError {
+    fn from(err: SpiError<DeviceError<Error, Infallible>, Infallible>) -> Self {
+        DisplayError::SpiError(err)
+    }
+}
+
+impl From<Infallible> for DisplayError {
     fn from(_: Infallible) -> Self {
         Self::Infallible
     }
