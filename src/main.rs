@@ -4,21 +4,15 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
-use cst816s::CST816S;
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
+use embedded_drivers_rs::cst816s::CST816S;
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_hal::delay::Delay;
-use esp_hal::{
-    clock::CpuClock,
-    gpio::{Input, NoPin},
-    i2c::master::I2c,
-    time,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time, timer::timg::TimerGroup};
 use esp_hal_embassy::main;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
@@ -28,7 +22,6 @@ extern crate alloc;
 
 mod config;
 mod display;
-mod rm67162;
 
 // Cube and projection constants
 const FOV: f32 = 200.0; // Field of View
@@ -106,55 +99,49 @@ async fn main(_spawner: Spawner) -> ! {
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
+    let delay = Delay::new();
+    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int, delay);
 
-    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int, NoPin);
-    let mut delay = Delay::new();
-    touchpad.setup(&mut delay).expect("touchpad setup failed");
-
-    let mut is_dragging = false;
-    let mut initial_touch_x: i32 = 0;
-    let mut initial_touch_y: i32 = 0;
+    let mut touch_registered = false;
+    let mut initial_touch_x: u16 = 0;
+    let mut initial_touch_y: u16 = 0;
 
     loop {
         // FPS calculation and display
         let current_time = time::now().duration_since_epoch().to_millis();
 
-        if let Some(touch_event) = touchpad.read_one_touch_event(false) {
-            match touch_event.action {
-                2 => {
-                    // Touch Contact / Move or Touch Down
-                    if !is_dragging {
-                        // Treat the first action:2 as Touch Down
-                        is_dragging = true;
-                        initial_touch_x = touch_event.x;
-                        initial_touch_y = touch_event.y;
-                        info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
-                    }
-                }
-                _ => {
-                    // Touch Lift
-                    info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
+        if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
+            if touch_event.points > 0 && !touch_registered {
+                // Touch Contact / Move or Touch Down
 
-                    // Calculate the difference between initial and final touch positions
-                    let delta_x = touch_event.x - initial_touch_x;
-                    let delta_y = touch_event.y - initial_touch_y;
+                touch_registered = true;
+                initial_touch_x = touch_event.x;
+                initial_touch_y = touch_event.y;
+                info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
+            } else if touch_event.points == 0 && touch_registered {
+                // Touch Lift
+                info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
-                    // Define rotation sensitivity
-                    const ROTATION_SENSITIVITY: f32 = 0.0005;
+                // Calculate the difference between initial and final touch positions
+                let delta_x = touch_event.x - initial_touch_x;
+                let delta_y = touch_event.y - initial_touch_y;
 
-                    // Calculate rotation angles based on touch movement
-                    let angle_y = (delta_x as f32) * ROTATION_SENSITIVITY; // Rotate around Y-axis
-                    let angle_x = (delta_y as f32) * ROTATION_SENSITIVITY; // Rotate around X-axis
+                // Define rotation sensitivity
+                const ROTATION_SENSITIVITY: f32 = 0.0005;
 
-                    // Create quaternions for the rotations
-                    let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
-                    let qy = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), angle_y);
+                // Calculate rotation angles based on touch movement
+                let angle_y = (delta_x as f32) * ROTATION_SENSITIVITY; // Rotate around Y-axis
+                let angle_x = (delta_y as f32) * ROTATION_SENSITIVITY; // Rotate around X-axis
 
-                    // Update the overall rotation
-                    rotation = qy * qx * rotation;
+                // Create quaternions for the rotations
+                let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
+                let qy = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), angle_y);
 
-                    info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
-                }
+                // Update the overall rotation
+                rotation = qy * qx * rotation;
+
+                info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
+                touch_registered = false
             }
         }
 

@@ -1,7 +1,9 @@
-use crate::rm67162::RM67162;
-
 use core::convert::Infallible;
 use defmt::info;
+use embedded_drivers_rs::mipidsi::interface::{SpiError, SpiInterface};
+use embedded_drivers_rs::mipidsi::options::{Orientation, Rotation};
+use embedded_drivers_rs::mipidsi::{Builder, Display as MipiDisplay};
+use embedded_drivers_rs::rm67162::RM67162;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
@@ -20,9 +22,6 @@ use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
 use esp_hal::{dma_buffers, prelude::*};
-use mipidsi::interface::{SpiError, SpiInterface};
-use mipidsi::options::Orientation;
-use mipidsi::{Builder, Display as MipiDisplay};
 
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -143,7 +142,7 @@ impl<'a> Display<'a> {
         let display = Builder::new(RM67162, di)
             .orientation(Orientation {
                 mirrored: false,
-                rotation: mipidsi::options::Rotation::Deg90,
+                rotation: Rotation::Deg90,
             })
             .display_size(DISPLAY_WIDTH, DISPLAY_HEIGHT)
             .reset_pin(Output::new(rst_pin, Level::High))

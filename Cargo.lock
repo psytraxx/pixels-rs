@@ -93,14 +93,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
-name = "cst816s"
-version = "1.0.0"
-source = "git+https://github.com/vstepanyuk/cst816s.git?branch=master#1e0cffbf69306548754bbfe6bc3c50441efa5298"
-dependencies = [
- "embedded-hal 1.0.0",
-]
-
-[[package]]
 name = "darling"
 version = "0.20.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -343,6 +335,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "994f7e5b5cb23521c22304927195f236813053eb9c065dd2226a32ba64695446"
 dependencies = [
  "stable_deref_trait",
+]
+
+[[package]]
+name = "embedded-drivers-rs"
+version = "0.1.0"
+source = "git+https://github.com/psytraxx/embedded-drivers-rs.git?branch=main#c2d414d9a818eb5760d4cb77b396e3db8a8a6d84"
+dependencies = [
+ "defmt",
+ "embedded-graphics-core",
+ "embedded-hal 1.0.0",
+ "libm",
+ "mipidsi",
 ]
 
 [[package]]
@@ -1005,11 +1009,11 @@ name = "pixels-rs"
 version = "0.1.0"
 dependencies = [
  "byte-slice-cast",
- "cst816s",
  "defmt",
  "defmt-rtt",
  "embassy-executor",
  "embassy-sync 0.6.1",
+ "embedded-drivers-rs",
  "embedded-graphics",
  "embedded-graphics-framebuf",
  "embedded-hal 1.0.0",
@@ -1020,7 +1024,6 @@ dependencies = [
  "esp-hal-embassy",
  "heapless",
  "micromath",
- "mipidsi",
  "num-traits",
 ]
 
