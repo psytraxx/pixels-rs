@@ -7,7 +7,6 @@ use core::{cell::RefCell, fmt::Write};
 use defmt::{info, warn};
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
-use embedded_drivers_rs::cst816s::CST816S;
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
@@ -16,6 +15,7 @@ use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time, timer::timg:
 use esp_hal_embassy::main;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
+use s3_display_amoled_touch_drivers::cst816s::CST816S;
 use {defmt_rtt as _, esp_backtrace as _};
 
 extern crate alloc;

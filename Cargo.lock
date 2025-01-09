@@ -338,17 +338,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-drivers-rs"
-version = "0.1.0"
-source = "git+https://github.com/psytraxx/embedded-drivers-rs.git?branch=main#51a60296b3556e91ee21574eef31e869dc821624"
-dependencies = [
- "embedded-graphics-core",
- "embedded-hal 1.0.0",
- "libm",
- "mipidsi",
-]
-
-[[package]]
 name = "embedded-graphics"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1012,7 +1001,6 @@ dependencies = [
  "defmt-rtt",
  "embassy-executor",
  "embassy-sync 0.6.1",
- "embedded-drivers-rs",
  "embedded-graphics",
  "embedded-graphics-framebuf",
  "embedded-hal 1.0.0",
@@ -1024,6 +1012,7 @@ dependencies = [
  "heapless",
  "micromath",
  "num-traits",
+ "s3-display-amoled-touch-drivers",
 ]
 
 [[package]]
@@ -1145,6 +1134,17 @@ name = "rustversion"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
+
+[[package]]
+name = "s3-display-amoled-touch-drivers"
+version = "0.1.0"
+source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#ea6f4a7e6caedffda681c2dd11ddce00015233c3"
+dependencies = [
+ "embedded-graphics-core",
+ "embedded-hal 1.0.0",
+ "libm",
+ "mipidsi",
+]
 
 [[package]]
 name = "scopeguard"

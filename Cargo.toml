@@ -4,13 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+s3-display-amoled-touch-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", branch = "main" }
 esp-backtrace = { version = "0.14.1", features = [
     "esp32s3",
     "exception-handler",
     "panic-handler",
     "defmt",
 ] }
-embedded-drivers-rs = { git = "https://github.com/psytraxx/embedded-drivers-rs.git", branch = "main" }
 embassy-sync = { version = "0.6.1", features = ["defmt"] }
 esp-hal = { version = "0.22.0", features = ["esp32s3", "defmt", "octal-psram"] }
 esp-alloc = { version = "0.5.0" }
