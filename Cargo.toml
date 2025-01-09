@@ -10,7 +10,7 @@ esp-backtrace = { version = "0.14.1", features = [
     "panic-handler",
     "defmt",
 ] }
-cst816s = { git = "https://github.com/vstepanyuk/cst816s.git", branch = "master", default-features = false }
+embedded-drivers-rs = { git = "https://github.com/psytraxx/embedded-drivers-rs.git", branch = "main" }
 embassy-sync = { version = "0.6.1", features = ["defmt"] }
 esp-hal = { version = "0.22.0", features = ["esp32s3", "defmt", "octal-psram"] }
 esp-alloc = { version = "0.5.0" }
@@ -19,7 +19,6 @@ heapless = { version = "0.8.0", default-features = false, features = [
 ] }
 defmt = "0.3.8"
 defmt-rtt = "0.4.1"
-mipidsi = "0.8.0"
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
 embassy-executor = { version = "0.6.0", features = [
     "task-arena-size-163840",
@@ -33,7 +32,6 @@ esp-hal-embassy = { version = "0.5.0", features = [
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 embedded-graphics-framebuf = "0.5.0"
-display-interface = { version = "0.5.0", features = ["defmt-03"] }
 embedded-hal-bus = { version = "0.2.0", features = ["defmt-03"] }
 byte-slice-cast = { version = "1.2.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false, features = [
