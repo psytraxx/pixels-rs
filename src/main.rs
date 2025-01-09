@@ -4,7 +4,7 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
-use defmt::info;
+use defmt::{info, warn};
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
 use embedded_drivers_rs::cst816s::CST816S;
@@ -103,28 +103,30 @@ async fn main(_spawner: Spawner) -> ! {
     let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int, delay);
 
     let mut touch_registered = false;
-    let mut initial_touch_x: u16 = 0;
-    let mut initial_touch_y: u16 = 0;
+    let mut initial_touch_x: i32 = 0;
+    let mut initial_touch_y: i32 = 0;
 
     loop {
         // FPS calculation and display
         let current_time = time::now().duration_since_epoch().to_millis();
 
         if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
-            if touch_event.points > 0 && !touch_registered {
+            if touch_event.event == 2 && !touch_registered {
                 // Touch Contact / Move or Touch Down
 
                 touch_registered = true;
-                initial_touch_x = touch_event.x;
-                initial_touch_y = touch_event.y;
+                initial_touch_x = touch_event.x as i32;
+                initial_touch_y = touch_event.y as i32;
                 info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
-            } else if touch_event.points == 0 && touch_registered {
+            } else {
                 // Touch Lift
                 info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
                 // Calculate the difference between initial and final touch positions
-                let delta_x = touch_event.x - initial_touch_x;
-                let delta_y = touch_event.y - initial_touch_y;
+                let delta_x = touch_event.x as i32 - initial_touch_x;
+                let delta_y = touch_event.y as i32 - initial_touch_y;
+
+                warn!("Touch Delta: ({}, {})", delta_x, delta_y);
 
                 // Define rotation sensitivity
                 const ROTATION_SENSITIVITY: f32 = 0.0005;
