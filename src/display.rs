@@ -8,7 +8,7 @@ use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
-use embedded_graphics::Drawable;
+use embedded_graphics::{Drawable, Pixel};
 use embedded_graphics_framebuf::FrameBuf;
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
@@ -218,11 +218,9 @@ impl<'a> DisplayTrait for Display<'a> {
             let pixel_iterator = self
                 .framebuf
                 .into_iter()
-                .filter(|p| {
-                    p.0.x as u16 >= min_x
-                        && p.0.x as u16 <= max_x
-                        && p.0.y as u16 >= min_y
-                        && p.0.y as u16 <= max_y
+                .filter(|Pixel(p, _)| {
+                    let (x, y) = (p.x as u16, p.y as u16);
+                    x >= min_x && x <= max_x && y >= min_y && y <= max_y
                 })
                 .map(|p| p.1);
 
