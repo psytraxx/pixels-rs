@@ -43,9 +43,33 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
     Output<'a>,
 >;
 
+#[derive(Default)]
+struct BoundingBox {
+    min_x: Option<u16>,
+    min_y: Option<u16>,
+    max_x: Option<u16>,
+    max_y: Option<u16>,
+}
+
+impl BoundingBox {
+    fn update(&mut self, p: Point) {
+        let x = p.x as u16;
+        let y = p.y as u16;
+        self.min_x = Some(self.min_x.map_or(x, |min| min.min(x)));
+        self.min_y = Some(self.min_y.map_or(y, |min| min.min(y)));
+        self.max_x = Some(self.max_x.map_or(x, |max| max.max(x)));
+        self.max_y = Some(self.max_y.map_or(y, |max| max.max(y)));
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
     framebuf: FrameBuf<Rgb565, DisplayBuffer>,
+    dirty_region: BoundingBox,
 }
 
 /// Display interface trait for ST7789 LCD controller
@@ -152,7 +176,11 @@ impl<'a> Display<'a> {
         let framebuf: FrameBuf<Rgb565, [Rgb565; _]> =
             FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
 
-        Ok(Self { display, framebuf })
+        Ok(Self {
+            display,
+            framebuf,
+            dirty_region: BoundingBox::default(),
+        })
     }
 }
 
@@ -160,7 +188,12 @@ impl<'a> DisplayTrait for Display<'a> {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
-        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.framebuf)?;
+        let end_position = Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top)
+            .draw(&mut self.framebuf)?;
+
+        self.dirty_region.update(position);
+        self.dirty_region.update(end_position);
+
         Ok(())
     }
 
@@ -168,17 +201,40 @@ impl<'a> DisplayTrait for Display<'a> {
         Line::new(start, end)
             .into_styled(PrimitiveStyle::with_stroke(RgbColor::WHITE, 2))
             .draw(&mut self.framebuf)?;
+
+        self.dirty_region.update(start);
+        self.dirty_region.update(end);
+
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
+        if let (Some(min_x), Some(min_y), Some(max_x), Some(max_y)) = (
+            self.dirty_region.min_x,
+            self.dirty_region.min_y,
+            self.dirty_region.max_x,
+            self.dirty_region.max_y,
+        ) {
+            let pixel_iterator = self
+                .framebuf
+                .into_iter()
+                .filter(|p| {
+                    p.0.x as u16 >= min_x
+                        && p.0.x as u16 <= max_x
+                        && p.0.y as u16 >= min_y
+                        && p.0.y as u16 <= max_y
+                })
+                .map(|p| p.1);
 
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
+            self.display
+                .set_pixels(min_x, min_y, max_x, max_y, pixel_iterator)?;
 
-        // Clear the frame buffer
-        self.framebuf.clear(RgbColor::BLACK)?;
+            // Clear the frame buffer
+            self.framebuf.clear(RgbColor::BLACK)?;
+            // Reset the dirty region
+            self.dirty_region.reset();
+        }
+
         Ok(())
     }
 }
