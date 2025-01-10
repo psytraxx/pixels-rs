@@ -18,9 +18,9 @@ use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
 use esp_hal::{dma_buffers, prelude::*};
-use s3_display_amoled_touch_drivers::mipidsi::interface::{SpiError, SpiInterface};
-use s3_display_amoled_touch_drivers::mipidsi::options::{Orientation, Rotation};
-use s3_display_amoled_touch_drivers::mipidsi::{Builder, Display as MipiDisplay};
+use mipidsi::interface::{SpiError, SpiInterface};
+use mipidsi::options::{Orientation, Rotation};
+use mipidsi::{Builder, Display as MipiDisplay};
 use s3_display_amoled_touch_drivers::rm67162::RM67162;
 
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
