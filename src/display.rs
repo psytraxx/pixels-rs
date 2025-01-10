@@ -172,10 +172,9 @@ impl<'a> DisplayTrait for Display<'a> {
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
-
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
+        let pixel_iterator: embedded_graphics_framebuf::PixelIterator<'_, Rgb565, [Rgb565; _]> =
+            self.framebuf.into_iter();
+        self.display.draw_iter(pixel_iterator)?;
 
         // Clear the frame buffer
         self.framebuf.clear(RgbColor::BLACK)?;
