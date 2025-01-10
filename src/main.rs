@@ -4,7 +4,7 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
-use defmt::{info, warn};
+use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
@@ -120,13 +120,13 @@ async fn main(_spawner: Spawner) -> ! {
                 info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
             } else {
                 // Touch Lift
-                info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
+                //info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
                 // Calculate the difference between initial and final touch positions
                 let delta_x = touch_event.x as i32 - initial_touch_x;
                 let delta_y = touch_event.y as i32 - initial_touch_y;
 
-                warn!("Touch Delta: ({}, {})", delta_x, delta_y);
+                //info!("Touch Delta: ({}, {})", delta_x, delta_y);
 
                 // Define rotation sensitivity
                 const ROTATION_SENSITIVITY: f32 = 0.0005;
@@ -142,7 +142,7 @@ async fn main(_spawner: Spawner) -> ! {
                 // Update the overall rotation
                 rotation = qy * qx * rotation;
 
-                info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
+                //info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
                 touch_registered = false
             }
         }
@@ -178,6 +178,7 @@ async fn main(_spawner: Spawner) -> ! {
             display
                 .write(&text, Point::new(0, 0))
                 .expect("Write text failed");
+            info!("FPS: {}", 1000 / ms_per_frame);
         }
 
         last_time = current_time;

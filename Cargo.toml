@@ -27,11 +27,7 @@ embassy-executor = { version = "0.6.0", features = [
     "task-arena-size-163840",
     "defmt",
 ] }
-esp-hal-embassy = { version = "0.5.0", features = [
-    "esp32s3",
-    "defmt",
-    "integrated-timers",
-] }
+esp-hal-embassy = { version = "0.5.0", features = ["esp32s3", "defmt"] }
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 embedded-graphics-framebuf = "0.5.0"
