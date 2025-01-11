@@ -1138,7 +1138,7 @@ checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 [[package]]
 name = "s3-display-amoled-touch-drivers"
 version = "0.1.0"
-source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#3cc557b67d1c4d5304269efa8fdae1e7ca1c4f88"
+source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#2c9bcaa58ec6e829444723884170a53332411667"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",
