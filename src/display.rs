@@ -1,5 +1,4 @@
 use core::convert::Infallible;
-use defmt::info;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
@@ -18,6 +17,7 @@ use esp_hal::peripherals::{DMA, SPI2};
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
 use esp_hal::{dma_buffers, prelude::*};
+use log::info;
 use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
