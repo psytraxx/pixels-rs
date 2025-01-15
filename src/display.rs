@@ -11,17 +11,18 @@ use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
-use esp_hal::dma::{Dma, DmaRxBuf, DmaTxBuf};
+use esp_hal::dma::{DmaChannel0, DmaRxBuf, DmaTxBuf};
+use esp_hal::dma_buffers;
 use esp_hal::gpio::{GpioPin, Level, Output};
-use esp_hal::peripherals::{DMA, SPI2};
+use esp_hal::peripherals::SPI2;
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
-use esp_hal::{dma_buffers, prelude::*};
+use esp_hal::time::RateExtU32;
 use log::info;
 use mipidsi::interface::{SpiError, SpiInterface};
+use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
-use s3_display_amoled_touch_drivers::rm67162::RM67162;
 
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -94,7 +95,7 @@ pub struct DisplayPeripherals {
     pub dc: GpioPin<7>,
     pub rst: GpioPin<17>,
     pub spi: SPI2,
-    pub dma: DMA,
+    pub dma: DmaChannel0,
 }
 
 impl<'a> Display<'a> {
@@ -104,26 +105,16 @@ impl<'a> Display<'a> {
         let mosi = Output::new(p.mosi, Level::Low);
         let cs = Output::new(p.cs, Level::High);
 
-        let mut pmicen = Output::new_typed(p.pmicen, Level::Low);
+        let mut pmicen = Output::new(p.pmicen, Level::Low);
         pmicen.set_high();
         info!("PMICEN set high");
 
-        let dma = Dma::new(p.dma);
-
         // Configure SPI
-        let spi = Spi::new_with_config(
-            p.spi,
-            Config {
-                frequency: 75.MHz(),
-                ..Config::default()
-            },
-        )
-        .with_sck(sck)
-        .with_mosi(mosi)
-        .with_dma(
-            dma.channel0
-                .configure(false, esp_hal::dma::DmaPriority::Priority0),
-        );
+        let spi = Spi::new(p.spi, Config::default().with_frequency(75_u32.MHz()))
+            .unwrap()
+            .with_sck(sck)
+            .with_mosi(mosi)
+            .with_dma(p.dma);
 
         let dc_pin = p.dc;
         let rst_pin = p.rst;
@@ -156,7 +147,7 @@ impl<'a> Display<'a> {
     }
 }
 
-impl<'a> DisplayTrait for Display<'a> {
+impl DisplayTrait for Display<'_> {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
