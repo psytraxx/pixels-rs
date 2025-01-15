@@ -34,13 +34,14 @@ async fn main(_spawner: Spawner) -> ! {
 
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::Clock240MHz;
+        config.cpu_clock = CpuClock::_240MHz;
         config
     });
 
     heap_allocator!(72 * 1024);
 
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
+        .unwrap()
         .with_sda(peripherals.GPIO3)
         .with_scl(peripherals.GPIO2);
 
@@ -54,7 +55,7 @@ async fn main(_spawner: Spawner) -> ! {
         rst: peripherals.GPIO17,
         pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
-        dma: peripherals.DMA,
+        dma: peripherals.DMA_CH0,
     };
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
