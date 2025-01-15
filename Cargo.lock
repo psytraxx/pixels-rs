@@ -461,9 +461,9 @@ dependencies = [
 
 [[package]]
 name = "esp-hal"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0219639e5154b0513d8a67f5431dd442f31479c5c1f0b21b377fd61f14e415c3"
+checksum = "a573175c540fd1d21a9cf07b0dee286b5a8f4cfde4b35da0f4f4657de7942c45"
 dependencies = [
  "basic-toml",
  "bitfield",
@@ -797,7 +797,7 @@ dependencies = [
 [[package]]
 name = "mipidsi"
 version = "0.9.0"
-source = "git+https://github.com/almindor/mipidsi.git?branch=master#6647786236b3668e6cd0ecda6b20d7bcb16fd684"
+source = "git+https://github.com/almindor/mipidsi.git?branch=master#3f92dc83857f726d9e3c14f4f801fbd90727a045"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",
@@ -1003,7 +1003,7 @@ checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 [[package]]
 name = "s3-display-amoled-touch-drivers"
 version = "0.1.0"
-source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#620aef81cd179fc469342372f8b3d7750a8ce3f0"
+source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#e01efa6b8144ace1540c7052c60e8047ee7c70c7"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",
