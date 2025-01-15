@@ -109,27 +109,26 @@ impl<'a> Display<'a> {
         pmicen.set_high();
         info!("PMICEN set high");
 
-        // Configure SPI
-        let spi = Spi::new(p.spi, Config::default().with_frequency(75_u32.MHz()))
-            .unwrap()
-            .with_sck(sck)
-            .with_mosi(mosi)
-            .with_dma(p.dma);
-
-        let dc_pin = p.dc;
-        let rst_pin = p.rst;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let spi = SpiDmaBus::new(spi, dma_rx_buf, dma_tx_buf);
+        // Configure SPI
+        let spi = Spi::new(p.spi, Config::default().with_frequency(80_u32.MHz()))
+            .unwrap()
+            .with_sck(sck)
+            .with_mosi(mosi)
+            .with_dma(p.dma)
+            .with_buffers(dma_rx_buf, dma_tx_buf);
 
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
+        let dc_pin = p.dc;
         let di = SpiInterface::new(spi_device, Output::new(dc_pin, Level::Low), buffer);
 
         let mut delay = Delay::new();
 
+        let rst_pin = p.rst;
         let display = Builder::new(RM67162, di)
             .orientation(Orientation {
                 mirrored: false,
