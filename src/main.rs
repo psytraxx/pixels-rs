@@ -180,7 +180,6 @@ async fn main(_spawner: Spawner) -> ! {
             display
                 .write(&text, Point::new(0, 0))
                 .expect("Write text failed");
-            info!("FPS: {}", 1000 / ms_per_frame);
         }
 
         last_time = current_time;
