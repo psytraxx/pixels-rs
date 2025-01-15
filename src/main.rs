@@ -4,6 +4,7 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
+use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
@@ -14,9 +15,9 @@ use esp_hal::delay::Delay;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time, timer::timg::TimerGroup};
 use esp_hal_embassy::main;
 use heapless::String;
-use log::info;
 use micromath::{vector::F32x3, Quaternion};
 use s3_display_amoled_touch_drivers::cst816s::CST816S;
+use {defmt_rtt as _, esp_backtrace as _};
 
 extern crate alloc;
 
@@ -30,8 +31,6 @@ const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
 async fn main(_spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::_240MHz;
