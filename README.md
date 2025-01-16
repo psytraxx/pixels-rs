@@ -30,7 +30,6 @@
 - `embedded-graphics`: 2D graphics library for embedded systems
 - `micromath`: Mathematical operations including quaternion support
 - `esp-hal`: ESP32-S3 hardware abstraction layer
-- `embassy-executor`: Async runtime for embedded systems
 - `embedded-hal-bus`: Hardware abstraction for I2C/SPI communication
 
 ## Getting Started

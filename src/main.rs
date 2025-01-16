@@ -6,14 +6,13 @@ use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
 use esp_hal::delay::Delay;
-use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time, timer::timg::TimerGroup};
-use esp_hal_embassy::main;
+use esp_hal::main;
+use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 use s3_display_amoled_touch_drivers::cst816s::CST816S;
@@ -30,7 +29,7 @@ const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
-async fn main(_spawner: Spawner) -> ! {
+fn main() -> ! {
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::_240MHz;
@@ -56,10 +55,6 @@ async fn main(_spawner: Spawner) -> ! {
         spi: peripherals.SPI2,
         dma: peripherals.DMA_CH0,
     };
-
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
-
-    esp_hal_embassy::init(timg0.timer0);
 
     psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let mut buffer = [0_u8; 512];
