@@ -27,6 +27,7 @@ use mipidsi::{Builder, Display as MipiDisplay};
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
+const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
 pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
 type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
@@ -156,7 +157,7 @@ impl DisplayTrait for Display<'_> {
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
         Line::new(start, end)
-            .into_styled(PrimitiveStyle::with_stroke(RgbColor::WHITE, 2))
+            .into_styled(LINE_STYLE)
             .draw(&mut self.framebuf)?;
         Ok(())
     }
