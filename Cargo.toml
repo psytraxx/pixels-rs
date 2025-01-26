@@ -26,7 +26,7 @@ embedded-graphics = { version = "0.8.1", features = ["defmt"] }
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 embedded-graphics-framebuf = "0.5.0"
-embedded-hal-bus = { version = "0.2.0", features = ["defmt-03"] }
+embedded-hal-bus = { version = "0.3.0", features = ["defmt-03"] }
 byte-slice-cast = { version = "1.2.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false, features = [
     "libm",

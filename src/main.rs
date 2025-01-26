@@ -102,6 +102,7 @@ fn main() -> ! {
     let mut touch_registered = false;
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
+    let mut text_x: u16 = 0;
 
     loop {
         // FPS calculation and display
@@ -169,12 +170,17 @@ fn main() -> ! {
         }
 
         let ms_per_frame = current_time - last_time;
-        if (ms_per_frame) > 0 {
+        if ms_per_frame > 0 {
             let mut text = String::<16>::new();
             write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
+
             display
-                .write(&text, Point::new(0, 0))
+                .write(&text, Point::new(text_x as i32, 0))
                 .expect("Write text failed");
+            text_x += 1;
+            if text_x > DISPLAY_WIDTH {
+                text_x = 0;
+            }
         }
 
         last_time = current_time;

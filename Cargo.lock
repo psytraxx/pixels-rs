@@ -350,15 +350,14 @@ dependencies = [
 
 [[package]]
 name = "embedded-hal-bus"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d3980bf28e8577db59fe2bdb3df868a419469d2cecb363644eea2b6f7797669"
+checksum = "513e0b3a8fb7d3013a8ae17a834283f170deaf7d0eeab0a7c1a36ad4dd356d22"
 dependencies = [
  "critical-section",
  "defmt",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
- "portable-atomic",
 ]
 
 [[package]]
@@ -786,9 +785,9 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "indexmap"
-version = "2.7.0"
+version = "2.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
+checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
 dependencies = [
  "equivalent",
  "hashbrown",
@@ -876,7 +875,7 @@ dependencies = [
 [[package]]
 name = "mipidsi"
 version = "0.9.0"
-source = "git+https://github.com/almindor/mipidsi.git?branch=master#3f92dc83857f726d9e3c14f4f801fbd90727a045"
+source = "git+https://github.com/almindor/mipidsi.git?branch=master#6fa050442a5b82831b8216d222fd8d47a3870b8e"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",
@@ -1079,7 +1078,7 @@ checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 [[package]]
 name = "s3-display-amoled-touch-drivers"
 version = "0.1.0"
-source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#757e152166801b5395c2694d8acbd542af10d7c7"
+source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?branch=main#6d8b50d821aa557fe135af64177ed9bd93d0da32"
 dependencies = [
  "embedded-graphics-core",
  "embedded-hal 1.0.0",
@@ -1238,9 +1237,9 @@ checksum = "e87a2ed6b42ec5e28cc3b94c09982969e9227600b2e3dcbc1db927a84c06bd69"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+checksum = "11cd88e12b17c6494200a9c1b683a04fcac9573ed74cd1b62aeb2727c5592243"
 
 [[package]]
 name = "usb-device"
