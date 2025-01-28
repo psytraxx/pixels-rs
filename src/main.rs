@@ -12,6 +12,8 @@ use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
 use esp_hal::delay::Delay;
 use esp_hal::main;
+use esp_hal::rtc_cntl::Rtc;
+use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
@@ -35,6 +37,14 @@ fn main() -> ! {
         config.cpu_clock = CpuClock::_240MHz;
         config
     });
+
+    let mut rtc = Rtc::new(peripherals.LPWR);
+    rtc.rwdt.disable();
+
+    let mut timer_group0 = TimerGroup::new(peripherals.TIMG0);
+    timer_group0.wdt.disable();
+    let mut timer_group1 = TimerGroup::new(peripherals.TIMG1);
+    timer_group1.wdt.disable();
 
     heap_allocator!(72 * 1024);
 

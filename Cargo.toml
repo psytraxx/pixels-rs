@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+#switch to official mipi-dsi crate when newer version that 0.9.0 is released
 mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
 s3-display-amoled-touch-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", branch = "main" }
 esp-backtrace = { version = "0.15.0", features = [
