@@ -10,14 +10,13 @@ use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
-use esp_hal::delay::Delay;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
-use s3_display_amoled_touch_drivers::cst816s::CST816S;
+use s3_display_amoled_touch::cst816s::{Event, CST816S};
 use {defmt_rtt as _, esp_backtrace as _};
 
 extern crate alloc;
@@ -106,10 +105,9 @@ fn main() -> ! {
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
-    let delay = Delay::new();
-    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int, delay);
 
-    let mut touch_registered = false;
+    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
     let mut text_x: u16 = 0;
@@ -119,39 +117,39 @@ fn main() -> ! {
         let current_time = time::now().duration_since_epoch().to_millis();
 
         if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
-            if touch_event.event == 2 && !touch_registered {
-                // Touch Contact / Move or Touch Down
+            match touch_event.event {
+                Event::Down => {
+                    initial_touch_x = touch_event.x as i32;
+                    initial_touch_y = touch_event.y as i32;
+                    info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
+                }
+                Event::Up => {
+                    // Touch Lift
+                    //info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
-                touch_registered = true;
-                initial_touch_x = touch_event.x as i32;
-                initial_touch_y = touch_event.y as i32;
-                info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
-            } else {
-                // Touch Lift
-                //info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
+                    // Calculate the difference between initial and final touch positions
+                    let delta_x = touch_event.x as i32 - initial_touch_x;
+                    let delta_y = touch_event.y as i32 - initial_touch_y;
 
-                // Calculate the difference between initial and final touch positions
-                let delta_x = touch_event.x as i32 - initial_touch_x;
-                let delta_y = touch_event.y as i32 - initial_touch_y;
+                    //info!("Touch Delta: ({}, {})", delta_x, delta_y);
 
-                //info!("Touch Delta: ({}, {})", delta_x, delta_y);
+                    // Define rotation sensitivity
+                    const ROTATION_SENSITIVITY: f32 = 0.0005;
 
-                // Define rotation sensitivity
-                const ROTATION_SENSITIVITY: f32 = 0.0005;
+                    // Calculate rotation angles based on touch movement
+                    let angle_y = (delta_x as f32) * ROTATION_SENSITIVITY; // Rotate around Y-axis
+                    let angle_x = (delta_y as f32) * ROTATION_SENSITIVITY; // Rotate around X-axis
 
-                // Calculate rotation angles based on touch movement
-                let angle_y = (delta_x as f32) * ROTATION_SENSITIVITY; // Rotate around Y-axis
-                let angle_x = (delta_y as f32) * ROTATION_SENSITIVITY; // Rotate around X-axis
+                    // Create quaternions for the rotations
+                    let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
+                    let qy = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), angle_y);
 
-                // Create quaternions for the rotations
-                let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
-                let qy = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), angle_y);
+                    // Update the overall rotation
+                    rotation = qy * qx * rotation;
 
-                // Update the overall rotation
-                rotation = qy * qx * rotation;
-
-                //info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
-                touch_registered = false
+                    //info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
+                }
+                _ => info!("Unknown touch event"),
             }
         }
 
