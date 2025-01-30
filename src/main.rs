@@ -4,19 +4,21 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
+use cst816s::command::Touch;
+use cst816s::Cst816s;
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
+use esp_hal::delay::Delay;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
-use s3_display_amoled_touch::cst816s::{Event, CST816S};
 use {defmt_rtt as _, esp_backtrace as _};
 
 extern crate alloc;
@@ -106,7 +108,10 @@ fn main() -> ! {
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
 
-    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    // Initialize delay
+    let delay = Delay::new();
+
+    let mut touchpad = Cst816s::new(RefCellDevice::new(&i2c_ref_cell), delay);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -116,14 +121,18 @@ fn main() -> ! {
         // FPS calculation and display
         let current_time = time::now().duration_since_epoch().to_millis();
 
-        if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
-            match touch_event.event {
-                Event::Down => {
+        if !touch_int.is_low() {
+            continue;
+        }
+
+        if let Ok(touch_event) = touchpad.read_event() {
+            match touch_event.touch_type {
+                Touch::Down => {
                     initial_touch_x = touch_event.x as i32;
                     initial_touch_y = touch_event.y as i32;
                     info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
                 }
-                Event::Up => {
+                Touch::Up => {
                     // Touch Lift
                     //info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
@@ -149,7 +158,9 @@ fn main() -> ! {
 
                     //info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
                 }
-                _ => info!("Unknown touch event"),
+                _ => {
+                    //ingore other touch events
+                }
             }
         }
 
