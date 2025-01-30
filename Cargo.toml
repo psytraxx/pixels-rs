@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 #switch to official mipi-dsi crate when newer version that 0.9.0 is released
 mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
-s3-display-amoled-touch = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", branch = "touch" }
+cst816s-rs = { git = "https://github.com/IniterWorker/cst816s", branch = "master", default-features = false }
 esp-backtrace = { version = "0.15.0", features = [
     "esp32s3",
     "exception-handler",
