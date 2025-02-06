@@ -1,15 +1,15 @@
 # Pixels-rs
 
-`pixels-rs` is a Rust project that demonstrates the use of an embedded graphics library to render an interactive 3D cube on an RM67162 AMOLED display with touch input capabilities. The project is designed to run on an ESP32-S3 microcontroller.
+`pixels-rs` is a Rust project that demonstrates real-time 3D graphics on an ESP32-S3 microcontroller with RM67162 AMOLED display and touch input capabilities.
 
 ## Features
 
-- Interactive 3D cube with touch-based rotation control
-- Quaternion-based rotation for smooth animation
-- Touch gesture recognition for cube manipulation
-- Real-time FPS display
-- Configurable display parameters
-- Support for CST816S touch controller
+- Interactive 3D cube with dual control:
+  - Automatic rotation
+  - Touch-based gesture control
+- Hardware-accelerated graphics using DMA
+- Quaternion-based smooth rotation
+- Real-time FPS counter
 
 ## Project Structure
 
@@ -20,14 +20,16 @@
 ## Hardware Requirements
 
 - ESP32-S3 microcontroller
-- RM67162 AMOLED display
+- RM67162 AMOLED display (536x240)
 - CST816S touch controller
-- I2C and SPI interfaces
+- SPI interface for display (pins 47, 18, - 6, 7, 17)
+- I2C interface for touch (pins 2, 3)
 
 ## Dependencies
 
-- `s3-display-amoled-touch-drivers`: Display and touch controller drivers
-- `embedded-graphics`: 2D graphics library for embedded systems
+- `mipidsi`: Display driver
+- `cst816s-rs`: Touch controller driver
+- `embedded-graphics`: 2D graphics primitives
 - `micromath`: Mathematical operations including quaternion support
 - `esp-hal`: ESP32-S3 hardware abstraction layer
 - `embedded-hal-bus`: Hardware abstraction for I2C/SPI communication
