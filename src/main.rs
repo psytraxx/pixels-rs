@@ -4,15 +4,13 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
-use cst816s::command::Touch;
-use cst816s::Cst816s;
+use cst816s::Event;
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
-use esp_hal::delay::Delay;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
@@ -24,6 +22,7 @@ use {defmt_rtt as _, esp_backtrace as _};
 extern crate alloc;
 
 mod config;
+mod cst816s;
 mod display;
 
 // Cube and projection constants
@@ -47,7 +46,7 @@ fn main() -> ! {
     let mut timer_group1 = TimerGroup::new(peripherals.TIMG1);
     timer_group1.wdt.disable();
 
-    heap_allocator!(72 * 1024);
+    heap_allocator!(size: 72 * 1024);
 
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
         .unwrap()
@@ -108,10 +107,7 @@ fn main() -> ! {
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
 
-    // Initialize delay
-    let delay = Delay::new();
-
-    let mut touchpad = Cst816s::new(RefCellDevice::new(&i2c_ref_cell), delay);
+    let mut touchpad = cst816s::CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -121,20 +117,16 @@ fn main() -> ! {
         // FPS calculation and display
         let current_time = time::now().duration_since_epoch().to_millis();
 
-        if !touch_int.is_low() {
-            continue;
-        }
-
-        if let Ok(touch_event) = touchpad.read_event() {
-            match touch_event.touch_type {
-                Touch::Down => {
+        if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
+            match touch_event.event {
+                Event::Down => {
                     initial_touch_x = touch_event.x as i32;
                     initial_touch_y = touch_event.y as i32;
                     info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
                 }
-                Touch::Up => {
+                Event::Up => {
                     // Touch Lift
-                    //info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
+                    info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
                     // Calculate the difference between initial and final touch positions
                     let delta_x = touch_event.x as i32 - initial_touch_x;
