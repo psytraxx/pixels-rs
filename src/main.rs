@@ -4,9 +4,9 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
-use cst816s::Event;
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
+use drivers::cst816s::{Event, CST816S};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
@@ -22,7 +22,6 @@ use {defmt_rtt as _, esp_backtrace as _};
 extern crate alloc;
 
 mod config;
-mod cst816s;
 mod display;
 
 // Cube and projection constants
@@ -107,7 +106,7 @@ fn main() -> ! {
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
 
-    let mut touchpad = cst816s::CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;

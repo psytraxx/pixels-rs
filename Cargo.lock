@@ -31,12 +31,6 @@ dependencies = [
 
 [[package]]
 name = "bitfield"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c821a6e124197eb56d907ccc2188eab1038fb919c914f47976e64dd8dbc855d1"
-
-[[package]]
-name = "bitfield"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f798d2d157e547aa99aab0967df39edd0b70307312b6f8bd2848e6abe40896e0"
@@ -91,16 +85,6 @@ name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
-
-[[package]]
-name = "cst816s-rs"
-version = "0.1.0"
-source = "git+https://github.com/IniterWorker/cst816s?branch=master#966a0761f992c63ea1a953ba3d4a3fab8de15db0"
-dependencies = [
- "bitfield 0.15.0",
- "embedded-hal 1.0.0",
- "libm",
-]
 
 [[package]]
 name = "darling"
@@ -197,6 +181,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95249b50c6c185bee49034bcb378a49dc2b5dff0be90ff6616d31d64febab05d"
 dependencies = [
  "litrs",
+]
+
+[[package]]
+name = "drivers"
+version = "0.1.0"
+source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?tag=v0.1.0#b659b3fd47d0f6e4104486710750e044424d6135"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "libm",
 ]
 
 [[package]]
@@ -511,7 +504,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a573175c540fd1d21a9cf07b0dee286b5a8f4cfde4b35da0f4f4657de7942c45"
 dependencies = [
  "basic-toml",
- "bitfield 0.17.0",
+ "bitfield",
  "bitflags 2.8.0",
  "bytemuck",
  "cfg-if",
@@ -943,9 +936,9 @@ name = "pixels-rs"
 version = "0.1.0"
 dependencies = [
  "byte-slice-cast",
- "cst816s-rs",
  "defmt",
  "defmt-rtt",
+ "drivers",
  "embedded-graphics",
  "embedded-graphics-framebuf",
  "embedded-hal 1.0.0",
