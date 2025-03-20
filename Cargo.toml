@@ -6,17 +6,17 @@ edition = "2021"
 [dependencies]
 #switch to official mipi-dsi crate when newer version that 0.9.0 is released
 mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.1.0" }
+drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.2.0" }
 esp-backtrace = { version = "0.15.0", features = [
     "esp32s3",
     "exception-handler",
     "panic-handler",
     "defmt",
 ] }
-esp-hal = { version = "0.23.0", default-features = false, features = [
+esp-hal = { version = "1.0.0-beta.0", default-features = false, features = [
     "esp32s3",
     "defmt",
-    "octal-psram",
+    "psram",
     "unstable",
 ] }
 esp-alloc = { version = "0.7.0" }
@@ -24,7 +24,6 @@ heapless = { version = "0.8.0", default-features = false, features = [] }
 defmt = "0.3.8"
 defmt-rtt = "0.4.1"
 embedded-graphics = { version = "0.8.1", features = ["defmt"] }
-embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 embedded-graphics-framebuf = "0.5.0"
 embedded-hal-bus = { version = "0.3.0", features = ["defmt-03"] }
@@ -32,6 +31,8 @@ byte-slice-cast = { version = "1.2.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false, features = [
     "libm",
 ] }
+esp-hal-embassy = { version = "0.7.0", features = ["defmt", "esp32s3"] }
+embassy-executor = "0.7.0"
 
 [profile.dev]
 # Rust debug is too slow.

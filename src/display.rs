@@ -14,11 +14,11 @@ use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
 use esp_hal::dma::{DmaChannel0, DmaRxBuf, DmaTxBuf};
 use esp_hal::dma_buffers;
-use esp_hal::gpio::{GpioPin, Level, Output};
+use esp_hal::gpio::{GpioPin, Level, Output, OutputConfig};
 use esp_hal::peripherals::SPI2;
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
-use esp_hal::time::RateExtU32;
+use esp_hal::time::Rate;
 use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
@@ -102,11 +102,11 @@ pub struct DisplayPeripherals {
 impl<'a> Display<'a> {
     pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, DisplayError> {
         // SPI pins
-        let sck = Output::new(p.sck, Level::Low);
-        let mosi = Output::new(p.mosi, Level::Low);
-        let cs = Output::new(p.cs, Level::High);
+        let sck = Output::new(p.sck, Level::Low, OutputConfig::default());
+        let mosi = Output::new(p.mosi, Level::Low, OutputConfig::default());
+        let cs = Output::new(p.cs, Level::High, OutputConfig::default());
 
-        let mut pmicen = Output::new(p.pmicen, Level::Low);
+        let mut pmicen = Output::new(p.pmicen, Level::Low, OutputConfig::default());
         pmicen.set_high();
         info!("PMICEN set high");
 
@@ -115,7 +115,7 @@ impl<'a> Display<'a> {
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         // Configure SPI
-        let spi = Spi::new(p.spi, Config::default().with_frequency(80_u32.MHz()))
+        let spi = Spi::new(p.spi, Config::default().with_frequency(Rate::from_mhz(80)))
             .unwrap()
             .with_sck(sck)
             .with_mosi(mosi)
@@ -125,7 +125,11 @@ impl<'a> Display<'a> {
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
         let dc_pin = p.dc;
-        let di = SpiInterface::new(spi_device, Output::new(dc_pin, Level::Low), buffer);
+        let di = SpiInterface::new(
+            spi_device,
+            Output::new(dc_pin, Level::Low, OutputConfig::default()),
+            buffer,
+        );
 
         let mut delay = Delay::new();
 
@@ -135,7 +139,7 @@ impl<'a> Display<'a> {
                 mirrored: false,
                 rotation: Rotation::Deg270,
             })
-            .reset_pin(Output::new(rst_pin, Level::High))
+            .reset_pin(Output::new(rst_pin, Level::High, OutputConfig::default()))
             .init(&mut delay)
             .unwrap();
 

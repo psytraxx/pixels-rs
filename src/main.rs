@@ -3,18 +3,19 @@
 #![feature(generic_arg_infer)]
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use core::{cell::RefCell, fmt::Write};
+use core::fmt::Write;
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use drivers::cst816s::{Event, CST816S};
+use drivers::cst816x::{CST816x, Event};
+use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
-use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
-use esp_hal::main;
+use esp_hal::gpio::InputConfig;
 use esp_hal::rtc_cntl::Rtc;
+use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
+use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 use {defmt_rtt as _, esp_backtrace as _};
@@ -29,13 +30,9 @@ const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
-#[main]
-fn main() -> ! {
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::_240MHz;
-        config
-    });
+#[esp_hal_embassy::main]
+async fn main(_s: Spawner) -> ! {
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.disable();
@@ -50,9 +47,8 @@ fn main() -> ! {
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
         .unwrap()
         .with_sda(peripherals.GPIO3)
-        .with_scl(peripherals.GPIO2);
-
-    let i2c_ref_cell = RefCell::new(i2c);
+        .with_scl(peripherals.GPIO2)
+        .into_async();
 
     let display_peripherals = DisplayPeripherals {
         sck: peripherals.GPIO47,
@@ -104,9 +100,12 @@ fn main() -> ! {
 
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
-    let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
+    let touch_int = Input::new(
+        touch_int,
+        InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+    );
 
-    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    let mut touchpad = CST816x::new(i2c, touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -114,9 +113,9 @@ fn main() -> ! {
 
     loop {
         // FPS calculation and display
-        let current_time = time::now().duration_since_epoch().to_millis();
+        let current_time = Instant::now().duration_since_epoch().as_millis();
 
-        if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
+        if let Ok(touch_event) = touchpad.read_touch().await {
             match touch_event.event {
                 Event::Down => {
                     initial_touch_x = touch_event.x as i32;
