@@ -6,7 +6,7 @@ use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
 use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use drivers::cst816s::{Event, CST816S};
+use drivers::cst816x::{CST816x, Event};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
@@ -106,7 +106,7 @@ fn main() -> ! {
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
 
-    let mut touchpad = CST816S::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -116,7 +116,7 @@ fn main() -> ! {
         // FPS calculation and display
         let current_time = time::now().duration_since_epoch().to_millis();
 
-        if let Ok(Some(touch_event)) = touchpad.read_touch(false) {
+        if let Ok(touch_event) = touchpad.read_touch() {
             match touch_event.event {
                 Event::Down => {
                     initial_touch_x = touch_event.x as i32;
