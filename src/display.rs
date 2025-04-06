@@ -1,5 +1,4 @@
 use core::convert::Infallible;
-use defmt::info;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
@@ -19,6 +18,7 @@ use esp_hal::peripherals::SPI2;
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
 use esp_hal::time::RateExtU32;
+use esp_println::println;
 use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
@@ -108,7 +108,7 @@ impl<'a> Display<'a> {
 
         let mut pmicen = Output::new(p.pmicen, Level::Low);
         pmicen.set_high();
-        info!("PMICEN set high");
+        println!("PMICEN set high");
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
