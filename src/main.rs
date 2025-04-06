@@ -4,20 +4,20 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
-use defmt::info;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
+use esp_backtrace as _;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
+use esp_println::println;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
-use {defmt_rtt as _, esp_backtrace as _};
 
 extern crate alloc;
 
@@ -121,17 +121,17 @@ fn main() -> ! {
                 Event::Down => {
                     initial_touch_x = touch_event.x as i32;
                     initial_touch_y = touch_event.y as i32;
-                    info!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
+                    println!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
                 }
                 Event::Up => {
                     // Touch Lift
-                    info!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
+                    println!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
                     // Calculate the difference between initial and final touch positions
                     let delta_x = touch_event.x as i32 - initial_touch_x;
                     let delta_y = touch_event.y as i32 - initial_touch_y;
 
-                    //info!("Touch Delta: ({}, {})", delta_x, delta_y);
+                    //println!("Touch Delta: ({}, {})", delta_x, delta_y);
 
                     // Define rotation sensitivity
                     const ROTATION_SENSITIVITY: f32 = 0.0005;
@@ -147,7 +147,7 @@ fn main() -> ! {
                     // Update the overall rotation
                     rotation = qy * qx * rotation;
 
-                    //info!("Applied rotation: {}", defmt::Debug2Format(&rotation));
+                    //println!("Applied rotation: {:?}", &rotation);
                 }
                 _ => {
                     //ingore other touch events
