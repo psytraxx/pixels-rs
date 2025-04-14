@@ -13,7 +13,7 @@ use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
 use esp_hal::dma::{DmaChannel0, DmaRxBuf, DmaTxBuf};
 use esp_hal::dma_buffers;
-use esp_hal::gpio::{GpioPin, Level, Output};
+use esp_hal::gpio::{AnyPin, Level, Output};
 use esp_hal::peripherals::SPI2;
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
@@ -89,12 +89,12 @@ pub trait DisplayTrait {
 }
 
 pub struct DisplayPeripherals {
-    pub sck: GpioPin<47>,
-    pub mosi: GpioPin<18>,
-    pub cs: GpioPin<6>,
-    pub pmicen: GpioPin<38>,
-    pub dc: GpioPin<7>,
-    pub rst: GpioPin<17>,
+    pub sck: AnyPin,
+    pub mosi: AnyPin,
+    pub cs: AnyPin,
+    pub pmicen: AnyPin,
+    pub dc: AnyPin,
+    pub rst: AnyPin,
     pub spi: SPI2,
     pub dma: DmaChannel0,
 }

@@ -10,12 +10,11 @@ use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
-use esp_backtrace as _;
+use esp_hal::gpio::Pin;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
-use esp_println::println;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
@@ -55,12 +54,12 @@ fn main() -> ! {
     let i2c_ref_cell = RefCell::new(i2c);
 
     let display_peripherals = DisplayPeripherals {
-        sck: peripherals.GPIO47,
-        mosi: peripherals.GPIO18,
-        cs: peripherals.GPIO6,
-        dc: peripherals.GPIO7,
-        rst: peripherals.GPIO17,
-        pmicen: peripherals.GPIO38,
+        sck: peripherals.GPIO47.degrade(),
+        mosi: peripherals.GPIO18.degrade(),
+        cs: peripherals.GPIO6.degrade(),
+        dc: peripherals.GPIO7.degrade(),
+        rst: peripherals.GPIO17.degrade(),
+        pmicen: peripherals.GPIO38.degrade(),
         spi: peripherals.SPI2,
         dma: peripherals.DMA_CH0,
     };
@@ -121,11 +120,11 @@ fn main() -> ! {
                 Event::Down => {
                     initial_touch_x = touch_event.x as i32;
                     initial_touch_y = touch_event.y as i32;
-                    println!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
+                    //println!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
                 }
                 Event::Up => {
                     // Touch Lift
-                    println!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
+                    //println!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
 
                     // Calculate the difference between initial and final touch positions
                     let delta_x = touch_event.x as i32 - initial_touch_x;
