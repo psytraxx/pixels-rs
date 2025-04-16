@@ -111,6 +111,9 @@ fn main() -> ! {
     let mut initial_touch_y: i32 = 0;
     let mut text_x: u16 = 0;
 
+    // Pre-calculate the constant automatic rotation quaternion
+    let q_auto = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
+
     loop {
         // FPS calculation and display
         let current_time = time::now().duration_since_epoch().to_millis();
@@ -154,8 +157,8 @@ fn main() -> ! {
             }
         }
 
-        let q = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
-        rotation = q * rotation;
+        // Apply pre-calculated automatic rotation
+        rotation = q_auto * rotation;
 
         // Transform and project vertices
         let mut transformed_vertices = [(0i32, 0i32); 8]; // Fixed size array
@@ -166,16 +169,30 @@ fn main() -> ! {
             let y = rotated.y;
             let z = rotated.z + PROJECTION_DISTANCE;
 
-            let px = ((x * FOV) / z) as i32 + half_width;
-            let py = ((y * FOV) / z) as i32 + half_height;
-            transformed_vertices[i] = (px, py);
+            // Perspective projection with check for division by near-zero z
+            let projected_point = if z.abs() > 0.01 { // Avoid division if z is too close to the camera plane
+                let inv_z = 1.0 / z; // Calculate inverse z once
+                let px = (x * FOV * inv_z) as i32 + half_width;
+                let py = (y * FOV * inv_z) as i32 + half_height;
+                (px, py)
+            } else {
+                // Point is too close or behind the camera, mark as invalid
+                (i32::MAX, i32::MAX) // Use MAX as an indicator for clipping/invalid point
+            };
+            transformed_vertices[i] = projected_point;
         }
 
         // Draw edges
         for &(start, end) in &edges {
-            let begin = Point::new(transformed_vertices[start].0, transformed_vertices[start].1);
-            let end = Point::new(transformed_vertices[end].0, transformed_vertices[end].1);
-            display.draw_line(begin, end).expect("Draw line failed");
+            let p1 = transformed_vertices[start];
+            let p2 = transformed_vertices[end];
+
+            // Only draw the line if both points are valid (not projected off-screen)
+            if p1.0 != i32::MAX && p2.0 != i32::MAX {
+                let begin = Point::new(p1.0, p1.1);
+                let end = Point::new(p2.0, p2.1);
+                display.draw_line(begin, end).expect("Draw line failed");
+            }
         }
 
         let ms_per_frame = current_time - last_time;
@@ -186,10 +203,9 @@ fn main() -> ! {
             display
                 .write(&text, Point::new(text_x as i32, 0))
                 .expect("Write text failed");
-            text_x += 1;
-            if text_x > DISPLAY_WIDTH {
-                text_x = 0;
-            }
+
+            // Update text position for scrolling effect using modulo
+            text_x = (text_x + 1) % DISPLAY_WIDTH;
         }
 
         last_time = current_time;
