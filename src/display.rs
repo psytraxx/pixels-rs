@@ -11,13 +11,13 @@ use embedded_graphics::Drawable;
 use embedded_graphics_framebuf::FrameBuf;
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
-use esp_hal::dma::{DmaChannel0, DmaRxBuf, DmaTxBuf};
+use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 use esp_hal::dma_buffers;
-use esp_hal::gpio::{AnyPin, Level, Output};
-use esp_hal::peripherals::SPI2;
+use esp_hal::gpio::{Level, Output, OutputConfig};
+use esp_hal::peripherals::{DMA_CH0, GPIO17, GPIO18, GPIO38, GPIO47, GPIO6, GPIO7, SPI2};
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
-use esp_hal::time::RateExtU32;
+use esp_hal::time::Rate;
 use esp_println::println;
 use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::models::RM67162;
@@ -89,33 +89,34 @@ pub trait DisplayTrait {
 }
 
 pub struct DisplayPeripherals {
-    pub sck: AnyPin,
-    pub mosi: AnyPin,
-    pub cs: AnyPin,
-    pub pmicen: AnyPin,
-    pub dc: AnyPin,
-    pub rst: AnyPin,
-    pub spi: SPI2,
-    pub dma: DmaChannel0,
+    pub sck: GPIO47<'static>,
+    pub mosi: GPIO18<'static>,
+    pub cs: GPIO6<'static>,
+    pub pmicen: GPIO7<'static>,
+    pub dc: GPIO17<'static>,
+    pub rst: GPIO38<'static>,
+    pub spi: SPI2<'static>,
+    pub dma: DMA_CH0<'static>,
 }
 
 impl<'a> Display<'a> {
     pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, DisplayError> {
         // SPI pins
-        let sck = Output::new(p.sck, Level::Low);
-        let mosi = Output::new(p.mosi, Level::Low);
-        let cs = Output::new(p.cs, Level::High);
+        let sck = Output::new(p.sck, Level::Low, OutputConfig::default());
+        let mosi = Output::new(p.mosi, Level::Low, OutputConfig::default());
+        let cs = Output::new(p.cs, Level::High, OutputConfig::default());
 
-        let mut pmicen = Output::new(p.pmicen, Level::Low);
+        let mut pmicen = Output::new(p.pmicen, Level::Low, OutputConfig::default());
         pmicen.set_high();
         println!("PMICEN set high");
 
+        #[allow(clippy::manual_div_ceil)]
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         // Configure SPI
-        let spi = Spi::new(p.spi, Config::default().with_frequency(80_u32.MHz()))
+        let spi = Spi::new(p.spi, Config::default().with_frequency(Rate::from_mhz(80)))
             .unwrap()
             .with_sck(sck)
             .with_mosi(mosi)
@@ -125,7 +126,11 @@ impl<'a> Display<'a> {
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
         let dc_pin = p.dc;
-        let di = SpiInterface::new(spi_device, Output::new(dc_pin, Level::Low), buffer);
+        let di = SpiInterface::new(
+            spi_device,
+            Output::new(dc_pin, Level::Low, OutputConfig::default()),
+            buffer,
+        );
 
         let mut delay = Delay::new();
 
@@ -135,7 +140,7 @@ impl<'a> Display<'a> {
                 mirrored: false,
                 rotation: Rotation::Deg270,
             })
-            .reset_pin(Output::new(rst_pin, Level::High))
+            .reset_pin(Output::new(rst_pin, Level::High, OutputConfig::default()))
             .init(&mut delay)
             .unwrap();
 
