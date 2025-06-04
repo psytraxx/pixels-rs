@@ -54,9 +54,9 @@ fn main() -> ! {
         sck: peripherals.GPIO47,
         mosi: peripherals.GPIO18,
         cs: peripherals.GPIO6,
-        pmicen: peripherals.GPIO7,
-        dc: peripherals.GPIO17,
-        rst: peripherals.GPIO38,
+        dc: peripherals.GPIO7,
+        rst: peripherals.GPIO17,
+        pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
         dma: peripherals.DMA_CH0,
     };

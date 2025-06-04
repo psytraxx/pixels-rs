@@ -92,9 +92,9 @@ pub struct DisplayPeripherals {
     pub sck: GPIO47<'static>,
     pub mosi: GPIO18<'static>,
     pub cs: GPIO6<'static>,
-    pub pmicen: GPIO7<'static>,
-    pub dc: GPIO17<'static>,
-    pub rst: GPIO38<'static>,
+    pub pmicen: GPIO38<'static>,
+    pub dc: GPIO7<'static>,
+    pub rst: GPIO17<'static>,
     pub spi: SPI2<'static>,
     pub dma: DMA_CH0<'static>,
 }
