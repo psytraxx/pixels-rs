@@ -8,7 +8,6 @@ use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
-use embedded_graphics_framebuf::FrameBuf;
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
 use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
@@ -47,7 +46,6 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
 
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
-    framebuf: FrameBuf<Rgb565, DisplayBuffer>,
 }
 
 /// Display interface trait for ST7789 LCD controller
@@ -144,11 +142,7 @@ impl<'a> Display<'a> {
             .init(&mut delay)
             .unwrap();
 
-        let data = [Rgb565::BLACK; LCD_PIXELS];
-        let framebuf: FrameBuf<Rgb565, [Rgb565; _]> =
-            FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
-
-        Ok(Self { display, framebuf })
+        Ok(Self { display })
     }
 }
 
@@ -156,25 +150,25 @@ impl DisplayTrait for Display<'_> {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
-        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.framebuf)?;
+        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.display)?;
         Ok(())
     }
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
         Line::new(start, end)
             .into_styled(LINE_STYLE)
-            .draw(&mut self.framebuf)?;
+            .draw(&mut self.display)?;
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
+        /* let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
 
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
-
+                self.display
+                    .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
+        */
         // Clear the frame buffer
-        self.framebuf.clear(RgbColor::BLACK)?;
+        self.display.clear(RgbColor::BLACK)?;
         Ok(())
     }
 }

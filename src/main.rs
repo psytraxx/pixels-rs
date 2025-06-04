@@ -16,6 +16,8 @@ use esp_hal::rtc_cntl::Rtc;
 use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
+use esp_println::logger::init_logger;
+use esp_println::println;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
@@ -31,6 +33,7 @@ const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
 fn main() -> ! {
+    init_logger(log::LevelFilter::Info);
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
 
     let mut rtc = Rtc::new(peripherals.LPWR);
