@@ -26,7 +26,6 @@ jobs:
         with:
           default: true
           buildtargets: esp32s3
-          version: "1.84.0"
           ldproxy: false
       - name: Enable caching
         uses: Swatinem/rust-cache@v2

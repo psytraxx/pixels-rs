@@ -8,28 +8,27 @@ use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
-use embedded_graphics_framebuf::FrameBuf;
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
-use esp_hal::dma::{DmaChannel0, DmaRxBuf, DmaTxBuf};
+use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 use esp_hal::dma_buffers;
-use esp_hal::gpio::{AnyPin, Level, Output};
-use esp_hal::peripherals::SPI2;
+use esp_hal::gpio::{Level, Output, OutputConfig};
+use esp_hal::peripherals::{DMA_CH0, GPIO17, GPIO18, GPIO38, GPIO47, GPIO6, GPIO7, SPI2};
 use esp_hal::spi::master::{Config, Spi, SpiDmaBus};
 use esp_hal::spi::Error;
-use esp_hal::time::RateExtU32;
+use esp_hal::time::Rate;
 use esp_println::println;
 use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
 
-use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
+//use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
-pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
-type DisplayBuffer = [Rgb565; LCD_PIXELS];
+//pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
+//type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
 pub type MipiDisplayWrapper<'a> = MipiDisplay<
     SpiInterface<
@@ -47,7 +46,6 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
 
 pub struct Display<'a> {
     display: MipiDisplayWrapper<'a>,
-    framebuf: FrameBuf<Rgb565, DisplayBuffer>,
 }
 
 /// Display interface trait for ST7789 LCD controller
@@ -89,33 +87,34 @@ pub trait DisplayTrait {
 }
 
 pub struct DisplayPeripherals {
-    pub sck: AnyPin,
-    pub mosi: AnyPin,
-    pub cs: AnyPin,
-    pub pmicen: AnyPin,
-    pub dc: AnyPin,
-    pub rst: AnyPin,
-    pub spi: SPI2,
-    pub dma: DmaChannel0,
+    pub sck: GPIO47<'static>,
+    pub mosi: GPIO18<'static>,
+    pub cs: GPIO6<'static>,
+    pub pmicen: GPIO38<'static>,
+    pub dc: GPIO7<'static>,
+    pub rst: GPIO17<'static>,
+    pub spi: SPI2<'static>,
+    pub dma: DMA_CH0<'static>,
 }
 
 impl<'a> Display<'a> {
     pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, DisplayError> {
         // SPI pins
-        let sck = Output::new(p.sck, Level::Low);
-        let mosi = Output::new(p.mosi, Level::Low);
-        let cs = Output::new(p.cs, Level::High);
+        let sck = Output::new(p.sck, Level::Low, OutputConfig::default());
+        let mosi = Output::new(p.mosi, Level::Low, OutputConfig::default());
+        let cs = Output::new(p.cs, Level::High, OutputConfig::default());
 
-        let mut pmicen = Output::new(p.pmicen, Level::Low);
+        let mut pmicen = Output::new(p.pmicen, Level::Low, OutputConfig::default());
         pmicen.set_high();
         println!("PMICEN set high");
 
+        #[allow(clippy::manual_div_ceil)]
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         // Configure SPI
-        let spi = Spi::new(p.spi, Config::default().with_frequency(80_u32.MHz()))
+        let spi = Spi::new(p.spi, Config::default().with_frequency(Rate::from_mhz(80)))
             .unwrap()
             .with_sck(sck)
             .with_mosi(mosi)
@@ -125,7 +124,11 @@ impl<'a> Display<'a> {
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
         let dc_pin = p.dc;
-        let di = SpiInterface::new(spi_device, Output::new(dc_pin, Level::Low), buffer);
+        let di = SpiInterface::new(
+            spi_device,
+            Output::new(dc_pin, Level::Low, OutputConfig::default()),
+            buffer,
+        );
 
         let mut delay = Delay::new();
 
@@ -135,15 +138,11 @@ impl<'a> Display<'a> {
                 mirrored: false,
                 rotation: Rotation::Deg270,
             })
-            .reset_pin(Output::new(rst_pin, Level::High))
+            .reset_pin(Output::new(rst_pin, Level::High, OutputConfig::default()))
             .init(&mut delay)
             .unwrap();
 
-        let data = [Rgb565::BLACK; LCD_PIXELS];
-        let framebuf: FrameBuf<Rgb565, [Rgb565; _]> =
-            FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
-
-        Ok(Self { display, framebuf })
+        Ok(Self { display })
     }
 }
 
@@ -151,25 +150,25 @@ impl DisplayTrait for Display<'_> {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
-        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.framebuf)?;
+        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.display)?;
         Ok(())
     }
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
         Line::new(start, end)
             .into_styled(LINE_STYLE)
-            .draw(&mut self.framebuf)?;
+            .draw(&mut self.display)?;
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
+        /* let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
 
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
-
+                self.display
+                    .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
+        */
         // Clear the frame buffer
-        self.framebuf.clear(RgbColor::BLACK)?;
+        self.display.clear(RgbColor::BLACK)?;
         Ok(())
     }
 }

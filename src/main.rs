@@ -10,11 +10,13 @@ use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::{heap_allocator, psram_allocator};
 use esp_backtrace as _;
-use esp_hal::gpio::Pin;
+use esp_hal::gpio::InputConfig;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
+use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
+use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
+use esp_println::logger::init_logger;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
@@ -30,11 +32,8 @@ const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
 fn main() -> ! {
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::_240MHz;
-        config
-    });
+    init_logger(log::LevelFilter::Info);
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.disable();
@@ -54,12 +53,12 @@ fn main() -> ! {
     let i2c_ref_cell = RefCell::new(i2c);
 
     let display_peripherals = DisplayPeripherals {
-        sck: peripherals.GPIO47.degrade(),
-        mosi: peripherals.GPIO18.degrade(),
-        cs: peripherals.GPIO6.degrade(),
-        dc: peripherals.GPIO7.degrade(),
-        rst: peripherals.GPIO17.degrade(),
-        pmicen: peripherals.GPIO38.degrade(),
+        sck: peripherals.GPIO47,
+        mosi: peripherals.GPIO18,
+        cs: peripherals.GPIO6,
+        dc: peripherals.GPIO7,
+        rst: peripherals.GPIO17,
+        pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
         dma: peripherals.DMA_CH0,
     };
@@ -103,7 +102,10 @@ fn main() -> ! {
 
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
-    let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
+    let touch_int = Input::new(
+        touch_int,
+        InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+    );
 
     let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
 
@@ -116,7 +118,7 @@ fn main() -> ! {
 
     loop {
         // FPS calculation and display
-        let current_time = time::now().duration_since_epoch().to_millis();
+        let current_time = Instant::now().duration_since_epoch().as_millis();
 
         if let Ok(touch_event) = touchpad.read_touch() {
             match touch_event.event {
@@ -170,7 +172,8 @@ fn main() -> ! {
             let z = rotated.z + PROJECTION_DISTANCE;
 
             // Perspective projection with check for division by near-zero z
-            let projected_point = if z.abs() > 0.01 { // Avoid division if z is too close to the camera plane
+            let projected_point = if z.abs() > 0.01 {
+                // Avoid division if z is too close to the camera plane
                 let inv_z = 1.0 / z; // Calculate inverse z once
                 let px = (x * FOV * inv_z) as i32 + half_width;
                 let py = (y * FOV * inv_z) as i32 + half_height;
