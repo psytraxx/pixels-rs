@@ -23,12 +23,12 @@ use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
 
-use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
+//use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
-pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
-type DisplayBuffer = [Rgb565; LCD_PIXELS];
+//pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
+//type DisplayBuffer = [Rgb565; LCD_PIXELS];
 
 pub type MipiDisplayWrapper<'a> = MipiDisplay<
     SpiInterface<

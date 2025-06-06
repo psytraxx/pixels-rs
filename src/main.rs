@@ -17,7 +17,6 @@ use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
 use esp_println::logger::init_logger;
-use esp_println::println;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
