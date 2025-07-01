@@ -1,6 +1,10 @@
 #![no_std]
 #![no_main]
-#![feature(generic_arg_infer)]
+#![deny(
+    clippy::mem_forget,
+    reason = "mem::forget is generally not safe to do with esp_hal types, especially those \
+    holding buffers for the duration of a data transfer."
+)]
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
@@ -10,15 +14,18 @@ use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
-use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
-use esp_println::logger::init_logger;
+use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
+use esp_hal::{main, time};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
 extern crate alloc;
+
+// This creates a default app-descriptor required by the esp-idf bootloader.
+// For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
+esp_bootloader_esp_idf::esp_app_desc!();
 
 mod config;
 mod display;
@@ -30,7 +37,7 @@ const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
 fn main() -> ! {
-    init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger_from_env();
 
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();

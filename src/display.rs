@@ -150,7 +150,7 @@ impl Display {
             .unwrap();
 
         let data = [Rgb565::BLACK; LCD_PIXELS];
-        let framebuf: FrameBuf<Rgb565, [Rgb565; _]> =
+        let framebuf: FrameBuf<Rgb565, [Rgb565; LCD_PIXELS]> =
             FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
 
         Ok(Self { display, framebuf })
