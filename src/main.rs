@@ -10,7 +10,6 @@ use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
-use esp_hal::gpio::Pin;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
@@ -55,12 +54,12 @@ fn main() -> ! {
     let i2c_ref_cell = RefCell::new(i2c);
 
     let display_peripherals = DisplayPeripherals {
-        sck: peripherals.GPIO47.degrade(),
-        mosi: peripherals.GPIO18.degrade(),
-        cs: peripherals.GPIO6.degrade(),
-        dc: peripherals.GPIO7.degrade(),
-        rst: peripherals.GPIO17.degrade(),
-        pmicen: peripherals.GPIO38.degrade(),
+        sck: peripherals.GPIO47,
+        mosi: peripherals.GPIO18,
+        cs: peripherals.GPIO6,
+        dc: peripherals.GPIO7,
+        rst: peripherals.GPIO17,
+        pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
         dma: peripherals.DMA_CH0,
     };
