@@ -8,13 +8,14 @@ use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
-use esp_alloc::{heap_allocator, psram_allocator};
+use esp_alloc::psram_allocator;
 use esp_backtrace as _;
 use esp_hal::gpio::Pin;
 use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c, time};
+use esp_println::logger::init_logger;
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
@@ -30,6 +31,8 @@ const ROTATION_SPEED: f32 = 0.03;
 
 #[main]
 fn main() -> ! {
+    init_logger(log::LevelFilter::Info);
+
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::_240MHz;
@@ -43,8 +46,6 @@ fn main() -> ! {
     timer_group0.wdt.disable();
     let mut timer_group1 = TimerGroup::new(peripherals.TIMG1);
     timer_group1.wdt.disable();
-
-    heap_allocator!(size: 72 * 1024);
 
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
         .unwrap()
@@ -65,8 +66,7 @@ fn main() -> ! {
     };
 
     psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-    let mut buffer = [0_u8; 512];
-    let mut display = Display::new(display_peripherals, &mut buffer).expect("Display init failed");
+    let mut display = Display::new(display_peripherals).expect("Display init failed");
 
     // Define cube vertices
     let cube_vertices: [F32x3; 8] = [
@@ -170,7 +170,8 @@ fn main() -> ! {
             let z = rotated.z + PROJECTION_DISTANCE;
 
             // Perspective projection with check for division by near-zero z
-            let projected_point = if z.abs() > 0.01 { // Avoid division if z is too close to the camera plane
+            let projected_point = if z.abs() > 0.01 {
+                // Avoid division if z is too close to the camera plane
                 let inv_z = 1.0 / z; // Calculate inverse z once
                 let px = (x * FOV * inv_z) as i32 + half_width;
                 let py = (y * FOV * inv_z) as i32 + half_height;

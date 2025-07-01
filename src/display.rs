@@ -23,6 +23,7 @@ use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
+use static_cell::StaticCell;
 
 use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -45,8 +46,8 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
     Output<'a>,
 >;
 
-pub struct Display<'a> {
-    display: MipiDisplayWrapper<'a>,
+pub struct Display {
+    display: MipiDisplayWrapper<'static>,
     framebuf: FrameBuf<Rgb565, DisplayBuffer>,
 }
 
@@ -99,8 +100,8 @@ pub struct DisplayPeripherals {
     pub dma: DmaChannel0,
 }
 
-impl<'a> Display<'a> {
-    pub fn new(p: DisplayPeripherals, buffer: &'a mut [u8]) -> Result<Self, DisplayError> {
+impl Display {
+    pub fn new(p: DisplayPeripherals) -> Result<Self, DisplayError> {
         // SPI pins
         let sck = Output::new(p.sck, Level::Low);
         let mosi = Output::new(p.mosi, Level::Low);
@@ -125,7 +126,15 @@ impl<'a> Display<'a> {
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
         let dc_pin = p.dc;
-        let di = SpiInterface::new(spi_device, Output::new(dc_pin, Level::Low), buffer);
+
+        const DISPLAY_BUFFER_SIZE: usize = 512;
+        static DISPLAY_BUFFER: StaticCell<[u8; DISPLAY_BUFFER_SIZE]> = StaticCell::new();
+
+        let di = SpiInterface::new(
+            spi_device,
+            Output::new(dc_pin, Level::Low),
+            DISPLAY_BUFFER.init_with(|| [0u8; DISPLAY_BUFFER_SIZE]),
+        );
 
         let mut delay = Delay::new();
 
@@ -147,7 +156,7 @@ impl<'a> Display<'a> {
     }
 }
 
-impl DisplayTrait for Display<'_> {
+impl DisplayTrait for Display {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
