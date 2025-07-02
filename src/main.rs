@@ -7,14 +7,13 @@
 )]
 
 use alloc::string::String;
+use core::cell::RefCell;
 use core::fmt::Write;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
-use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
-use embassy_sync::mutex::Mutex;
 use embedded_graphics::prelude::Point;
+use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
 use esp_hal::gpio::{InputConfig, Pull};
@@ -25,7 +24,6 @@ use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input};
 use micromath::{vector::F32x3, Quaternion};
-use static_cell::StaticCell;
 
 use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
@@ -58,13 +56,6 @@ async fn main(_spawner: Spawner) {
     timer_group0.wdt.disable();
     let mut timer_group1 = TimerGroup::new(peripherals.TIMG1);
     timer_group1.wdt.disable();
-
-    let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
-        .unwrap()
-        .with_sda(peripherals.GPIO3)
-        .with_scl(peripherals.GPIO2);
-
-    //let i2c_ref_cell = RefCell::new(i2c);
 
     let display_peripherals = DisplayPeripherals {
         sck: peripherals.GPIO47,
@@ -119,14 +110,14 @@ async fn main(_spawner: Spawner) {
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(touch_int, InputConfig::default().with_pull(Pull::Up));
 
-    static I2C_BUS_FG: StaticCell<
-        Mutex<NoopRawMutex, esp_hal::i2c::master::I2c<'_, esp_hal::Blocking>>,
-    > = StaticCell::new();
-    let i2c_bus_fg = I2C_BUS_FG.init(Mutex::new(i2c));
+    let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
+        .unwrap()
+        .with_sda(peripherals.GPIO3)
+        .with_scl(peripherals.GPIO2);
 
-    let device = I2cDevice::new(&i2c_bus_fg);
+    let i2c_ref_cell = RefCell::new(i2c);
 
-    let mut touchpad = CST816x::new(device, touch_int);
+    let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -227,7 +218,7 @@ async fn main(_spawner: Spawner) {
                 .expect("Write text failed");
 
             // Update text position for scrolling effect using modulo
-            text_x = (text_x + 1) % DISPLAY_WIDTH as u16;
+            text_x = (text_x + 1) % DISPLAY_WIDTH;
         }
 
         last_time = current_time;

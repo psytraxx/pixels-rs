@@ -133,9 +133,6 @@ impl Display {
 
         let dc_pin = p.dc;
 
-        const DISPLAY_BUFFER_SIZE: usize = 512;
-        static DISPLAY_BUFFER: StaticCell<[u8; DISPLAY_BUFFER_SIZE]> = StaticCell::new();
-
         let di = SpiInterface::new(
             spi_device,
             Output::new(dc_pin, Level::Low, OutputConfig::default()),
