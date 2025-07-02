@@ -6,7 +6,6 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
@@ -23,13 +22,14 @@ use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
 use heapless::String;
 use micromath::{vector::F32x3, Quaternion};
 
+use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
+
 extern crate alloc;
 
 // This creates a default app-descriptor required by the esp-idf bootloader.
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
 
-mod config;
 mod display;
 
 // Cube and projection constants
@@ -105,7 +105,7 @@ fn main() -> ! {
     let half_width = (DISPLAY_WIDTH / 2) as i32;
     let half_height = (DISPLAY_HEIGHT / 2) as i32;
 
-    // initalize touchpad
+    // initialize touchpad
     let touch_int = peripherals.GPIO21;
     let touch_int = Input::new(
         touch_int,
@@ -213,7 +213,7 @@ fn main() -> ! {
                 .expect("Write text failed");
 
             // Update text position for scrolling effect using modulo
-            text_x = (text_x + 1) % DISPLAY_WIDTH;
+            text_x = (text_x + 1) % DISPLAY_WIDTH as u16;
         }
 
         last_time = current_time;

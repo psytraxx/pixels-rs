@@ -1,14 +1,16 @@
 use core::convert::Infallible;
 use embedded_graphics::draw_target::DrawTarget;
+use embedded_graphics::framebuffer::{buffer_size, Framebuffer};
 use embedded_graphics::geometry::Point;
+use embedded_graphics::image::Image;
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::pixelcolor::raw::{LittleEndian, RawU16};
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
-use embedded_graphics::prelude::Primitive;
+use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::Drawable;
-use embedded_graphics_framebuf::FrameBuf;
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
 use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
@@ -25,12 +27,20 @@ use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
 use static_cell::StaticCell;
 
-use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-
+pub const DISPLAY_WIDTH: usize = 536;
+pub const DISPLAY_HEIGHT: usize = 240;
+const DISPLAY_BUFFER_SIZE: usize = 512;
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
-pub const LCD_PIXELS: usize = (DISPLAY_HEIGHT as usize) * (DISPLAY_WIDTH as usize);
-type DisplayBuffer = [Rgb565; LCD_PIXELS];
+
+type DisplayBuffer = Framebuffer<
+    Rgb565,
+    RawU16,
+    LittleEndian,
+    DISPLAY_WIDTH,
+    DISPLAY_HEIGHT,
+    { buffer_size::<Rgb565>(DISPLAY_WIDTH, DISPLAY_HEIGHT) },
+>;
 
 pub type MipiDisplayWrapper<'a> = MipiDisplay<
     SpiInterface<
@@ -48,7 +58,7 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
 
 pub struct Display {
     display: MipiDisplayWrapper<'static>,
-    framebuf: FrameBuf<Rgb565, DisplayBuffer>,
+    framebuf: DisplayBuffer,
 }
 
 /// Display interface trait for ST7789 LCD controller
@@ -128,7 +138,6 @@ impl Display {
 
         let dc_pin = p.dc;
 
-        const DISPLAY_BUFFER_SIZE: usize = 512;
         static DISPLAY_BUFFER: StaticCell<[u8; DISPLAY_BUFFER_SIZE]> = StaticCell::new();
 
         let di = SpiInterface::new(
@@ -149,9 +158,14 @@ impl Display {
             .init(&mut delay)
             .unwrap();
 
-        let data = [Rgb565::BLACK; LCD_PIXELS];
-        let framebuf: FrameBuf<Rgb565, [Rgb565; LCD_PIXELS]> =
-            FrameBuf::new(data, DISPLAY_WIDTH as usize, DISPLAY_HEIGHT as usize);
+        let framebuf = Framebuffer::<
+            Rgb565,
+            _,
+            LittleEndian,
+            DISPLAY_WIDTH,
+            DISPLAY_HEIGHT,
+            { buffer_size::<Rgb565>(DISPLAY_WIDTH, DISPLAY_HEIGHT) },
+        >::new();
 
         Ok(Self { display, framebuf })
     }
@@ -173,10 +187,7 @@ impl DisplayTrait for Display {
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        let pixel_iterator = self.framebuf.into_iter().map(|p| p.1);
-
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
+        Image::new(&self.framebuf.as_image(), Point::zero()).draw(&mut self.display)?;
 
         // Clear the frame buffer
         self.framebuf.clear(RgbColor::BLACK)?;
