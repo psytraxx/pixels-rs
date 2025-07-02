@@ -29,6 +29,9 @@ use static_cell::StaticCell;
 
 pub const DISPLAY_WIDTH: usize = 536;
 pub const DISPLAY_HEIGHT: usize = 240;
+/// This buffer is used by the `mipidsi` driver for SPI communication.
+/// A larger buffer can improve performance but consumes more RAM.
+/// 512 bytes is a reasonable default size.
 const DISPLAY_BUFFER_SIZE: usize = 512;
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
@@ -134,7 +137,7 @@ impl Display {
             .with_dma(p.dma)
             .with_buffers(dma_rx_buf, dma_tx_buf);
 
-        let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
+        let spi_device = ExclusiveDevice::new_no_delay(spi, cs)?;
 
         let dc_pin = p.dc;
 
