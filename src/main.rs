@@ -6,20 +6,28 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use core::{cell::RefCell, fmt::Write};
+use alloc::string::String;
+use core::fmt::Write;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
+use embassy_executor::Spawner;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
+use embassy_sync::mutex::Mutex;
 use embedded_graphics::prelude::Point;
-use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
+use esp_hal::gpio::{InputConfig, Pull};
+use esp_hal::i2c::master::I2c;
 use esp_hal::rtc_cntl::Rtc;
+use esp_hal::time::Instant;
+use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
-use esp_hal::{main, time};
-use heapless::String;
+use esp_hal::{clock::CpuClock, gpio::Input};
 use micromath::{vector::F32x3, Quaternion};
+use static_cell::StaticCell;
+
+use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 extern crate alloc;
 
@@ -27,7 +35,6 @@ extern crate alloc;
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
 
-mod config;
 mod display;
 
 // Cube and projection constants
@@ -35,15 +42,14 @@ const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
-#[main]
-fn main() -> ! {
+#[esp_hal_embassy::main]
+async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
 
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::_240MHz;
-        config
-    });
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+
+    let timer0 = SystemTimer::new(peripherals.SYSTIMER);
+    esp_hal_embassy::init(timer0.alarm0);
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.disable();
@@ -58,7 +64,7 @@ fn main() -> ! {
         .with_sda(peripherals.GPIO3)
         .with_scl(peripherals.GPIO2);
 
-    let i2c_ref_cell = RefCell::new(i2c);
+    //let i2c_ref_cell = RefCell::new(i2c);
 
     let display_peripherals = DisplayPeripherals {
         sck: peripherals.GPIO47,
@@ -72,7 +78,9 @@ fn main() -> ! {
     };
 
     psram_allocator!(peripherals.PSRAM, esp_hal::psram);
-    let mut display = Display::new(display_peripherals).expect("Display init failed");
+    let mut display = Display::new(display_peripherals)
+        .await
+        .expect("Display init failed");
 
     // Define cube vertices
     let cube_vertices: [F32x3; 8] = [
@@ -109,9 +117,16 @@ fn main() -> ! {
 
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
-    let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
+    let touch_int = Input::new(touch_int, InputConfig::default().with_pull(Pull::Up));
 
-    let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    static I2C_BUS_FG: StaticCell<
+        Mutex<NoopRawMutex, esp_hal::i2c::master::I2c<'_, esp_hal::Blocking>>,
+    > = StaticCell::new();
+    let i2c_bus_fg = I2C_BUS_FG.init(Mutex::new(i2c));
+
+    let device = I2cDevice::new(&i2c_bus_fg);
+
+    let mut touchpad = CST816x::new(device, touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -122,7 +137,7 @@ fn main() -> ! {
 
     loop {
         // FPS calculation and display
-        let current_time = time::now().duration_since_epoch().to_millis();
+        let current_time = Instant::now().duration_since_epoch().as_millis();
 
         if let Ok(touch_event) = touchpad.read_touch() {
             match touch_event.event {
@@ -204,7 +219,7 @@ fn main() -> ! {
 
         let ms_per_frame = current_time - last_time;
         if ms_per_frame > 0 {
-            let mut text = String::<16>::new();
+            let mut text = String::new();
             write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
 
             display
@@ -212,13 +227,14 @@ fn main() -> ! {
                 .expect("Write text failed");
 
             // Update text position for scrolling effect using modulo
-            text_x = (text_x + 1) % DISPLAY_WIDTH;
+            text_x = (text_x + 1) % DISPLAY_WIDTH as u16;
         }
 
         last_time = current_time;
 
         display
             .update_with_buffer()
+            .await
             .expect("Update with buffer failed");
     }
 }
