@@ -7,13 +7,11 @@
 )]
 
 use alloc::string::String;
-use core::cell::RefCell;
 use core::fmt::Write;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
 use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
-use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
 use esp_hal::gpio::{InputConfig, Pull};
@@ -115,9 +113,7 @@ async fn main(_spawner: Spawner) {
         .with_sda(peripherals.GPIO3)
         .with_scl(peripherals.GPIO2);
 
-    let i2c_ref_cell = RefCell::new(i2c);
-
-    let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    let mut touchpad = CST816x::new(i2c, touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;

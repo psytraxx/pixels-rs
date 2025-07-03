@@ -400,16 +400,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-hal-bus"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "513e0b3a8fb7d3013a8ae17a834283f170deaf7d0eeab0a7c1a36ad4dd356d22"
-dependencies = [
- "critical-section",
- "embedded-hal 1.0.0",
-]
-
-[[package]]
 name = "embedded-io"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -871,9 +861,9 @@ dependencies = [
 
 [[package]]
 name = "lcd-async"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94324b4d63bb810867193391ed5b5cb3eef3795f79f44c59c969d1c710e7212d"
+checksum = "362f088c5c176ceedd4d0e817d17ae3b79480495deac605158a7cd86450450c5"
 dependencies = [
  "embedded-graphics",
  "embedded-graphics-core",
@@ -1036,7 +1026,6 @@ dependencies = [
  "embedded-graphics",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
- "embedded-hal-bus",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
