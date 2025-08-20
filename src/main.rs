@@ -21,6 +21,7 @@ use esp_hal::time::Instant;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input};
+use esp_hal_embassy::main;
 use micromath::{vector::F32x3, Quaternion};
 
 use crate::display::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
@@ -38,7 +39,7 @@ const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
-#[esp_hal_embassy::main]
+#[main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
 
