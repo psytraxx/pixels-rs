@@ -4,17 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-esp-bootloader-esp-idf = "0.1.0"
-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.5.1" }
+esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3", "log-04"] }
+drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.6.0" }
 embassy-time = { version = "0.4.0", features = [] }
-embassy-embedded-hal = "0.3.0"
-esp-backtrace = { version = "0.16.0", features = [
+embassy-embedded-hal = "0.4.0"
+esp-backtrace = { version = "0.17.0", features = [
     "esp32s3",
     "exception-handler",
     "panic-handler",
     "println",
 ] }
-esp-hal = { version = "1.0.0-beta.1", default-features = false, features = [
+esp-hal = { version = "1.0.0-rc.0", default-features = false, features = [
     "esp32s3",
     "psram",
     "unstable",
@@ -24,16 +24,16 @@ embassy-executor = { version = "0.7.0", features = [
     "log",
     "task-arena-size-20480",
 ] }
-embassy-sync = "0.6.2"
+embassy-sync = "0.7.1"
 esp-hal-embassy = { version = "0.8.1", features = ["log-04", "esp32s3"] }
 esp-alloc = { version = "0.8.0" }
 heapless = { version = "0.8.0", default-features = false, features = [] }
-esp-println = { version = "0.14.0", features = ["esp32s3", "log-04"] }
+esp-println = { version = "0.15.0", features = ["esp32s3", "log-04"] }
 embedded-graphics = { version = "0.8.1", features = [] }
-embedded-hal = { version = "1.0.0"}
+embedded-hal = { version = "1.0.0" }
 embedded-hal-async = "1.0.0"
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
-static_cell = { version = "2.1.0", features = ["nightly"] }
+static_cell = { version = "2.1.1", features = ["nightly"] }
 num-traits = { version = "0.2.19", default-features = false, features = [
     "libm",
 ] }
