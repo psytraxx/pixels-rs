@@ -1,13 +1,15 @@
+use alloc::vec::Vec;
 use core::convert::Infallible;
+use core::fmt::Debug;
 use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::geometry::Point;
+use embedded_graphics::geometry::{OriginDimensions, Point, Size};
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle};
 use embedded_graphics::text::{Baseline, Text};
-use embedded_graphics::Drawable;
+use embedded_graphics::{Drawable, Pixel};
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
 use esp_hal::dma::DmaTxBuf;
@@ -22,6 +24,8 @@ use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
 use mipidsi::{Builder, Display as MipiDisplay};
 use static_cell::StaticCell;
+
+use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
@@ -42,6 +46,44 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
 
 pub struct Display {
     display: MipiDisplayWrapper<'static>,
+    front_buffer: Vec<Rgb565>,
+    back_buffer: Vec<Rgb565>,
+}
+
+struct BufferDrawTarget<'a> {
+    buffer: &'a mut Vec<Rgb565>,
+    width: usize,
+    height: usize,
+}
+
+impl<'a> DrawTarget for BufferDrawTarget<'a> {
+    type Color = Rgb565;
+    type Error = Infallible;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(coord, color) in pixels {
+            if coord.x >= 0
+                && coord.x < self.width as i32
+                && coord.y >= 0
+                && coord.y < self.height as i32
+            {
+                let index = (coord.y as usize) * self.width + coord.x as usize;
+                if index < self.buffer.len() {
+                    self.buffer[index] = color;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'a> OriginDimensions for BufferDrawTarget<'a> {
+    fn size(&self) -> Size {
+        Size::new(self.width as u32, self.height as u32)
+    }
 }
 
 /// Display interface trait for ST7789 LCD controller
@@ -50,7 +92,7 @@ pub struct Display {
 /// Implementations should handle the low-level display communication.
 pub trait DisplayTrait {
     /// Error type
-    type Error: core::fmt::Debug;
+    type Error: Debug;
 
     /// Writes text to the display at the specified position
     ///
@@ -109,7 +151,7 @@ impl Display {
         let spi_dma = Spi::new(
             p.spi,
             SpiConfig::default()
-                .with_frequency(Rate::from_mhz(75))
+                .with_frequency(Rate::from_mhz(80))
                 .with_mode(Mode::_0),
         )
         .unwrap()
@@ -142,7 +184,17 @@ impl Display {
             .init(&mut delay)
             .unwrap();
 
-        Ok(Self { display })
+        let buffer_size = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize);
+        let mut front_buffer = Vec::new();
+        front_buffer.resize(buffer_size, Rgb565::BLACK);
+        let mut back_buffer = Vec::new();
+        back_buffer.resize(buffer_size, Rgb565::BLACK);
+
+        Ok(Self {
+            display,
+            front_buffer,
+            back_buffer,
+        })
     }
 }
 
@@ -150,25 +202,40 @@ impl DisplayTrait for Display {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
-        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut self.display)?;
+        let mut target = BufferDrawTarget {
+            buffer: &mut self.back_buffer,
+            width: DISPLAY_WIDTH as usize,
+            height: DISPLAY_HEIGHT as usize,
+        };
+        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut target)?;
         Ok(())
     }
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
+        let mut target = BufferDrawTarget {
+            buffer: &mut self.back_buffer,
+            width: DISPLAY_WIDTH as usize,
+            height: DISPLAY_HEIGHT as usize,
+        };
         Line::new(start, end)
             .into_styled(LINE_STYLE)
-            .draw(&mut self.display)?;
+            .draw(&mut target)?;
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        /*         let pixel_iterator = self.display.into_iter().map(|p| p.1);
-
-        self.display
-            .set_pixels(0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT, pixel_iterator)?;
-
-        // Clear the frame buffer*/
-        self.display.clear(RgbColor::BLACK)?;
+        // Send front_buffer to display
+        self.display.set_pixels(
+            0,
+            0,
+            DISPLAY_WIDTH - 1,
+            DISPLAY_HEIGHT - 1,
+            self.front_buffer.iter().cloned(),
+        )?;
+        // Swap buffers
+        core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
+        // Clear back buffer
+        self.back_buffer.fill(Rgb565::BLACK);
         Ok(())
     }
 }
