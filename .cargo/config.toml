@@ -5,6 +5,7 @@ runner = "espflash flash -c esp32s3 -s 16mb -m dio -f 80mhz --no-skip --monitor"
 ESP_LOG = "INFO"
 ESP_WIFI_COUNTRY_CODE = "DE"
 ESP_HAL_PLACE_SPI_DRIVER_IN_RAM = "true"
+ESP_HAL_CONFIG_PSRAM_MODE = "octal"
 
 [build]
 rustflags = ["-C", "link-arg=-nostartfiles"]

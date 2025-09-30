@@ -14,11 +14,14 @@ use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
+use esp_hal::gpio::{InputConfig, Level, Output, OutputConfig, Pull};
+use esp_hal::main;
 use esp_hal::rtc_cntl::Rtc;
+use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
-use esp_hal::{main, time};
 use heapless::String;
+use log::info;
 use micromath::{vector::F32x3, Quaternion};
 
 extern crate alloc;
@@ -39,11 +42,7 @@ const ROTATION_SPEED: f32 = 0.03;
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
 
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::_240MHz;
-        config
-    });
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
 
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.disable();
@@ -66,13 +65,20 @@ fn main() -> ! {
         cs: peripherals.GPIO6,
         dc: peripherals.GPIO7,
         rst: peripherals.GPIO17,
-        pmicen: peripherals.GPIO38,
         spi: peripherals.SPI2,
         dma: peripherals.DMA_CH0,
     };
 
     psram_allocator!(peripherals.PSRAM, esp_hal::psram);
+
+    // Enable the power management IC by setting the PMICEN pin high
+    let mut pmicen = Output::new(peripherals.GPIO38, Level::Low, OutputConfig::default());
+    pmicen.set_high();
+    info!("PMICEN set high");
+
     let mut display = Display::new(display_peripherals).expect("Display init failed");
+
+    info!("Display initialized!");
 
     // Define cube vertices
     let cube_vertices: [F32x3; 8] = [
@@ -109,7 +115,7 @@ fn main() -> ! {
 
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
-    let touch_int = Input::new(touch_int, esp_hal::gpio::Pull::Up);
+    let touch_int = Input::new(touch_int, InputConfig::default().with_pull(Pull::None));
 
     let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
 
@@ -122,7 +128,7 @@ fn main() -> ! {
 
     loop {
         // FPS calculation and display
-        let current_time = time::now().duration_since_epoch().to_millis();
+        let current_time = Instant::now().duration_since_epoch().as_millis();
 
         if let Ok(touch_event) = touchpad.read_touch() {
             match touch_event.event {
