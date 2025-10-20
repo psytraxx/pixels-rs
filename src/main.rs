@@ -8,10 +8,15 @@
 
 use alloc::string::String;
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use core::{cell::RefCell, fmt::Write};
+use core::{
+    cell::RefCell,
+    cmp::{max, min},
+    fmt::Write,
+};
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
 use embedded_graphics::prelude::Point;
+use embedded_graphics::primitives::Rectangle;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
@@ -36,6 +41,8 @@ mod display;
 const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
+const FPS_FONT_WIDTH: i32 = 10;
+const FPS_FONT_HEIGHT: i32 = 20;
 
 #[main]
 fn main() -> ! {
@@ -119,6 +126,8 @@ fn main() -> ! {
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
     let mut text_x: u16 = 0;
+    let mut prev_cube_rect: Option<Rectangle> = None;
+    let mut prev_text_rect: Option<Rectangle> = None;
 
     // Pre-calculate the constant automatic rotation quaternion
     let q_auto = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
@@ -192,6 +201,39 @@ fn main() -> ! {
             transformed_vertices[i] = projected_point;
         }
 
+        // Compute current cube bounds for partial updates
+        let mut min_x = i32::MAX;
+        let mut min_y = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut max_y = i32::MIN;
+
+        for &(x, y) in &transformed_vertices {
+            if x != i32::MAX && y != i32::MAX {
+                min_x = min(min_x, x);
+                min_y = min(min_y, y);
+                max_x = max(max_x, x);
+                max_y = max(max_y, y);
+            }
+        }
+
+        let cube_rect = if min_x <= max_x && min_y <= max_y {
+            let margin = 2;
+            let clipped_min_x = max(min_x - margin, 0);
+            let clipped_min_y = max(min_y - margin, 0);
+            let clipped_max_x = min(max_x + margin, (DISPLAY_WIDTH - 1) as i32);
+            let clipped_max_y = min(max_y + margin, (DISPLAY_HEIGHT - 1) as i32);
+            Some(Rectangle::with_corners(
+                Point::new(clipped_min_x, clipped_min_y),
+                Point::new(clipped_max_x, clipped_max_y),
+            ))
+        } else {
+            None
+        };
+
+        if let Some(prev_rect) = prev_cube_rect {
+            display.mark_region_dirty(prev_rect);
+        }
+
         // Draw edges
         for &(start, end) in &edges {
             let p1 = transformed_vertices[start];
@@ -205,14 +247,29 @@ fn main() -> ! {
             }
         }
 
+        prev_cube_rect = cube_rect;
+
         let ms_per_frame = current_time - last_time;
         if ms_per_frame > 0 {
             let mut text = String::with_capacity(16);
             write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
 
+            if let Some(prev_rect) = prev_text_rect {
+                display.mark_region_dirty(prev_rect);
+            }
+
+            let text_width = (text.len() as i32) * FPS_FONT_WIDTH;
+            let text_height = FPS_FONT_HEIGHT;
+            let current_text_rect = Rectangle::new(
+                Point::new(text_x as i32, 0),
+                embedded_graphics::geometry::Size::new(text_width as u32, text_height as u32),
+            );
+
             display
                 .write(&text, Point::new(text_x as i32, 0))
                 .expect("Write text failed");
+
+            prev_text_rect = Some(current_text_rect);
 
             // Update text position for scrolling effect using modulo
             text_x = (text_x + 1) % DISPLAY_WIDTH;

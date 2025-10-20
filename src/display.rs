@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::cmp::{max, min};
 use core::convert::Infallible;
 use core::fmt::Debug;
 use embedded_graphics::draw_target::DrawTarget;
@@ -6,8 +7,8 @@ use embedded_graphics::geometry::{OriginDimensions, Point, Size};
 use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
-use embedded_graphics::prelude::Primitive;
-use embedded_graphics::primitives::{Line, PrimitiveStyle};
+use embedded_graphics::prelude::{Dimensions, Primitive};
+use embedded_graphics::primitives::{Line, PrimitiveStyle, Rectangle};
 use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::{Drawable, Pixel};
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
@@ -48,6 +49,7 @@ pub struct Display {
     display: MipiDisplayWrapper<'static>,
     front_buffer: Vec<Rgb565>,
     back_buffer: Vec<Rgb565>,
+    dirty_region: Option<Rectangle>,
 }
 
 struct BufferDrawTarget<'a> {
@@ -194,7 +196,43 @@ impl Display {
             display,
             front_buffer,
             back_buffer,
+            dirty_region: None,
         })
+    }
+}
+
+impl Display {
+    /// Marks an axis-aligned region as dirty so it gets flushed on the next update.
+    pub fn mark_region_dirty(&mut self, region: Rectangle) {
+        let display_rect = Rectangle::with_corners(
+            Point::new(0, 0),
+            Point::new((DISPLAY_WIDTH - 1) as i32, (DISPLAY_HEIGHT - 1) as i32),
+        );
+
+        let clipped = region.intersection(&display_rect);
+
+        if clipped.size.width == 0 || clipped.size.height == 0 {
+            return;
+        }
+
+        self.dirty_region = Some(match self.dirty_region.take() {
+            Some(existing) => {
+                let existing_br = existing.bottom_right().unwrap_or(existing.top_left);
+                let clipped_br = clipped.bottom_right().unwrap_or(clipped.top_left);
+
+                let top_left = Point::new(
+                    min(existing.top_left.x, clipped.top_left.x),
+                    min(existing.top_left.y, clipped.top_left.y),
+                );
+                let bottom_right = Point::new(
+                    max(existing_br.x, clipped_br.x),
+                    max(existing_br.y, clipped_br.y),
+                );
+
+                Rectangle::with_corners(top_left, bottom_right)
+            }
+            None => clipped,
+        });
     }
 }
 
@@ -202,39 +240,53 @@ impl DisplayTrait for Display {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
+        let drawable = Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top);
+        self.mark_region_dirty(drawable.bounding_box());
         let mut target = BufferDrawTarget {
             buffer: &mut self.back_buffer,
             width: DISPLAY_WIDTH as usize,
             height: DISPLAY_HEIGHT as usize,
         };
-        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut target)?;
+        drawable.draw(&mut target)?;
         Ok(())
     }
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
+        let styled = Line::new(start, end).into_styled(LINE_STYLE);
+        self.mark_region_dirty(styled.bounding_box());
         let mut target = BufferDrawTarget {
             buffer: &mut self.back_buffer,
             width: DISPLAY_WIDTH as usize,
             height: DISPLAY_HEIGHT as usize,
         };
-        Line::new(start, end)
-            .into_styled(LINE_STYLE)
-            .draw(&mut target)?;
+        styled.draw(&mut target)?;
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        // Send front_buffer to display
-        self.display.set_pixels(
-            0,
-            0,
-            DISPLAY_WIDTH - 1,
-            DISPLAY_HEIGHT - 1,
-            self.front_buffer.iter().cloned(),
-        )?;
-        // Swap buffers
+        let Some(region) = self.dirty_region.take() else {
+            return Ok(());
+        };
+
+        let top_left = region.top_left;
+        let bottom_right = region.bottom_right().unwrap_or(region.top_left);
+
+        let x_start = max(top_left.x, 0) as u16;
+        let y_start = max(top_left.y, 0) as u16;
+        let x_end = min(bottom_right.x, (DISPLAY_WIDTH - 1) as i32) as u16;
+        let y_end = min(bottom_right.y, (DISPLAY_HEIGHT - 1) as i32) as u16;
+
+        let width = DISPLAY_WIDTH as usize;
+        for y in y_start..=y_end {
+            let row = y as usize;
+            let start = row * width + x_start as usize;
+            let len = (x_end - x_start + 1) as usize;
+            let slice = &self.back_buffer[start..start + len];
+            self.display
+                .set_pixels(x_start, y, x_end, y, slice.iter().copied())?;
+        }
+
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
-        // Clear back buffer
         self.back_buffer.fill(Rgb565::BLACK);
         Ok(())
     }
