@@ -6,6 +6,7 @@
     holding buffers for the duration of a data transfer."
 )]
 
+use alloc::string::String;
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::{cell::RefCell, fmt::Write};
 use display::{Display, DisplayPeripherals, DisplayTrait};
@@ -20,7 +21,6 @@ use esp_hal::rtc_cntl::Rtc;
 use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
-use heapless::String;
 use log::info;
 use micromath::{vector::F32x3, Quaternion};
 
@@ -214,7 +214,7 @@ fn main() -> ! {
 
         let ms_per_frame = current_time - last_time;
         if ms_per_frame > 0 {
-            let mut text = String::<16>::new();
+            let mut text = String::with_capacity(16);
             write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
 
             display
