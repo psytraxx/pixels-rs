@@ -4,25 +4,48 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32s3", "log-04"] }
-#switch to official mipi-dsi crate when newer version that 0.9.0 is released
-mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.7.0" }
-esp-backtrace = { version = "0.17.0", features = [
+esp-hal = { version = "=1.0.0-rc.1", features = [
     "esp32s3",
-    "exception-handler",
+    "log-04",
+    "unstable",
+    "psram",
+] }
+
+esp-rtos = { version = "0.1.1", features = [
+    "embassy",
+    "esp-alloc",
+    "esp-radio",
+    "esp32s3",
+    "log-04",
+] }
+
+esp-bootloader-esp-idf = { version = "0.3.0", features = ["esp32s3"] }
+log = "0.4.27"
+
+embassy-net = { version = "0.7.0", features = [
+    "dhcpv4",
+    "log",
+    "medium-ethernet",
+    "tcp",
+    "udp",
+] }
+embedded-io = "0.7.1"
+embedded-io-async = "0.7.0"
+esp-alloc = "0.9.0"
+esp-backtrace = { version = "0.18.0", features = [
+    "esp32s3",
     "panic-handler",
     "println",
 ] }
-esp-hal = { version = "1.0.0-rc.0", features = [
-    "esp32s3",
-    "psram",
-    "unstable",
-    "log-04",
-] }
+esp-println = { version = "0.16.0", features = ["esp32s3", "log-04"] }
+# for more networking protocol support see https://crates.io/crates/edge-net
+embassy-executor = { version = "0.9.0", features = ["log"] }
+embassy-time = { version = "0.5.0", features = ["log"] }
+
+#switch to official mipi-dsi crate when newer version that 0.9.0 is released
+mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
+drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.8.0" }
 heapless = { version = "0.8.0", default-features = false, features = [] }
-esp-alloc = { version = "0.8.0" }
-esp-println = { version = "0.15.0", features = ["esp32s3", "log-04"] }
 embedded-graphics = { version = "0.8.1", features = [] }
 embedded-hal = { version = "1.0.0", features = [] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
@@ -31,7 +54,6 @@ embedded-hal-bus = { version = "0.3.0", features = [] }
 num-traits = { version = "0.2.19", default-features = false, features = [
     "libm",
 ] }
-log = "0.4.28"
 
 [profile.dev]
 # Rust debug is too slow.

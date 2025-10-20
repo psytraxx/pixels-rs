@@ -44,6 +44,8 @@ fn main() -> ! {
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
 
+    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 73744);
+
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.disable();
 
@@ -51,6 +53,8 @@ fn main() -> ! {
     timer_group0.wdt.disable();
     let mut timer_group1 = TimerGroup::new(peripherals.TIMG1);
     timer_group1.wdt.disable();
+
+    esp_rtos::start(timer_group0.timer0);
 
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
         .unwrap()
