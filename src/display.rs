@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::convert::Infallible;
 use core::fmt::Debug;
 use embedded_graphics::draw_target::DrawTarget;
@@ -224,7 +224,8 @@ impl DisplayTrait for Display {
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
         // Queue text for deferred rendering
-        self.pending_text.push((alloc::string::String::from(text), position));
+        self.pending_text
+            .push((alloc::string::String::from(text), position));
         Ok(())
     }
 
@@ -295,13 +296,6 @@ impl DisplayTrait for Display {
         )?;
 
         Ok(())
-    }
-}
-
-impl Display {
-    /// Clears the back buffer - call this at the start of each frame
-    pub fn clear_buffer(&mut self) {
-        self.back_buffer.fill(Rgb565::BLACK);
     }
 }
 
