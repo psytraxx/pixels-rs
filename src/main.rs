@@ -125,6 +125,9 @@ fn main() -> ! {
     let q_auto = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
 
     loop {
+        // Clear buffer at start of frame (optimization: clear before rendering instead of after swap)
+        display.clear_buffer();
+
         // FPS calculation and display
         let current_time = Instant::now().duration_since_epoch().as_millis();
 

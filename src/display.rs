@@ -238,9 +238,15 @@ impl DisplayTrait for Display {
         // Swap buffers
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
 
-        // Clear back buffer
-        self.back_buffer.fill(Rgb565::BLACK);
+        // Clear happens at the start of next frame (see clear_buffer method)
         Ok(())
+    }
+}
+
+impl Display {
+    /// Clears the back buffer - call this at the start of each frame
+    pub fn clear_buffer(&mut self) {
+        self.back_buffer.fill(Rgb565::BLACK);
     }
 }
 
