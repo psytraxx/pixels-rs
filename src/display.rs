@@ -44,10 +44,59 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
     Output<'a>,
 >;
 
+const TILE_SIZE: u16 = 32; // 32x32 pixel tiles
+const TILES_X: usize = ((DISPLAY_WIDTH + TILE_SIZE - 1) / TILE_SIZE) as usize; // 17 tiles wide
+const TILES_Y: usize = ((DISPLAY_HEIGHT + TILE_SIZE - 1) / TILE_SIZE) as usize; // 8 tiles high
+const TOTAL_TILES: usize = TILES_X * TILES_Y; // 136 tiles total
+
 pub struct Display {
     display: MipiDisplayWrapper<'static>,
     front_buffer: Vec<Rgb565>,
     back_buffer: Vec<Rgb565>,
+    current_tiles: TileTracker, // Tiles drawn this frame
+    prev_tiles: TileTracker,    // Tiles to clear (from 2 frames ago)
+}
+
+#[derive(Clone, Copy)]
+struct TileTracker {
+    dirty: [bool; TOTAL_TILES],
+}
+
+impl TileTracker {
+    fn new() -> Self {
+        Self {
+            dirty: [false; TOTAL_TILES],
+        }
+    }
+
+    fn mark_rect(&mut self, x1: u16, y1: u16, x2: u16, y2: u16) {
+        let min_x = x1.min(x2).min(DISPLAY_WIDTH - 1);
+        let max_x = x1.max(x2).min(DISPLAY_WIDTH - 1);
+        let min_y = y1.min(y2).min(DISPLAY_HEIGHT - 1);
+        let max_y = y1.max(y2).min(DISPLAY_HEIGHT - 1);
+
+        let tile_x1 = (min_x / TILE_SIZE) as usize;
+        let tile_x2 = (max_x / TILE_SIZE) as usize;
+        let tile_y1 = (min_y / TILE_SIZE) as usize;
+        let tile_y2 = (max_y / TILE_SIZE) as usize;
+
+        for ty in tile_y1..=tile_y2 {
+            for tx in tile_x1..=tile_x2 {
+                let tile_idx = ty * TILES_X + tx;
+                if tile_idx < TOTAL_TILES {
+                    self.dirty[tile_idx] = true;
+                }
+            }
+        }
+    }
+
+    fn clear(&mut self) {
+        self.dirty.fill(false);
+    }
+
+    fn is_dirty(&self, tile_idx: usize) -> bool {
+        tile_idx < TOTAL_TILES && self.dirty[tile_idx]
+    }
 }
 
 struct BufferDrawTarget<'a> {
@@ -196,6 +245,8 @@ impl Display {
             display,
             front_buffer,
             back_buffer,
+            current_tiles: TileTracker::new(),
+            prev_tiles: TileTracker::new(),
         })
     }
 }
@@ -209,6 +260,19 @@ impl DisplayTrait for Display {
             width: DISPLAY_WIDTH as usize,
             height: DISPLAY_HEIGHT as usize,
         };
+
+        // Estimate text bounds (10x20 font)
+        let text_width = (text.len() as u16) * 10;
+        let text_height = 20u16;
+
+        let x = position.x.max(0) as u16;
+        let y = position.y.max(0) as u16;
+        let x2 = (x + text_width).min(DISPLAY_WIDTH - 1);
+        let y2 = (y + text_height).min(DISPLAY_HEIGHT - 1);
+
+        // Mark tiles dirty
+        self.current_tiles.mark_rect(x, y, x2, y2);
+
         Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut target)?;
         Ok(())
     }
@@ -219,6 +283,15 @@ impl DisplayTrait for Display {
             width: DISPLAY_WIDTH as usize,
             height: DISPLAY_HEIGHT as usize,
         };
+
+        // Mark tiles dirty (add small padding for 2-pixel stroke)
+        let x1 = start.x.max(0).saturating_sub(2) as u16;
+        let y1 = start.y.max(0).saturating_sub(2) as u16;
+        let x2 = (end.x.max(0) + 2).min(DISPLAY_WIDTH as i32 - 1) as u16;
+        let y2 = (end.y.max(0) + 2).min(DISPLAY_HEIGHT as i32 - 1) as u16;
+
+        self.current_tiles.mark_rect(x1, y1, x2, y2);
+
         Line::new(start, end)
             .into_styled(LINE_STYLE)
             .draw(&mut target)?;
@@ -226,27 +299,66 @@ impl DisplayTrait for Display {
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        // Send front_buffer to display (use copied() for zero-cost iteration)
-        self.display.set_pixels(
-            0,
-            0,
-            DISPLAY_WIDTH - 1,
-            DISPLAY_HEIGHT - 1,
-            self.front_buffer.iter().copied(),
-        )?;
-
-        // Swap buffers
+        // Swap buffers FIRST so front_buffer has the newly drawn frame
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
 
-        // Clear happens at the start of next frame (see clear_buffer method)
+        // Update each dirty tile (union of current and previous)
+        for tile_idx in 0..TOTAL_TILES {
+            if self.current_tiles.is_dirty(tile_idx) || self.prev_tiles.is_dirty(tile_idx) {
+                let tile_x = (tile_idx % TILES_X) as u16;
+                let tile_y = (tile_idx / TILES_X) as u16;
+
+                let x_start = tile_x * TILE_SIZE;
+                let y_start = tile_y * TILE_SIZE;
+                let x_end = (x_start + TILE_SIZE - 1).min(DISPLAY_WIDTH - 1);
+                let y_end = (y_start + TILE_SIZE - 1).min(DISPLAY_HEIGHT - 1);
+
+                let tile_width = (x_end - x_start + 1) as usize;
+
+                // Create iterator for this tile's pixels
+                let tile_pixels = (y_start..=y_end).flat_map(|y| {
+                    let row_start = (y as usize) * (DISPLAY_WIDTH as usize) + (x_start as usize);
+                    self.front_buffer[row_start..row_start + tile_width]
+                        .iter()
+                        .copied()
+                });
+
+                // Send tile to display
+                self.display
+                    .set_pixels(x_start, y_start, x_end, y_end, tile_pixels)?;
+            }
+        }
+
+        // Save current tiles for clearing 2 frames later
+        self.prev_tiles = self.current_tiles;
+        self.current_tiles.clear();
+
         Ok(())
     }
 }
 
 impl Display {
-    /// Clears the back buffer - call this at the start of each frame
+    /// Clears only the dirty tiles of the back buffer - call this at the start of each frame
     pub fn clear_buffer(&mut self) {
-        self.back_buffer.fill(Rgb565::BLACK);
+        // Clear tiles that were dirty 2 frames ago
+        for tile_idx in 0..TOTAL_TILES {
+            if self.prev_tiles.is_dirty(tile_idx) {
+                let tile_x = (tile_idx % TILES_X) as u16;
+                let tile_y = (tile_idx / TILES_X) as u16;
+
+                let x_start = (tile_x * TILE_SIZE) as usize;
+                let y_start = (tile_y * TILE_SIZE) as usize;
+                let x_end = ((tile_x + 1) * TILE_SIZE).min(DISPLAY_WIDTH) as usize;
+                let y_end = ((tile_y + 1) * TILE_SIZE).min(DISPLAY_HEIGHT) as usize;
+
+                // Clear this tile
+                for y in y_start..y_end {
+                    let row_start = y * (DISPLAY_WIDTH as usize) + x_start;
+                    let row_end = y * (DISPLAY_WIDTH as usize) + x_end;
+                    self.back_buffer[row_start..row_end].fill(Rgb565::BLACK);
+                }
+            }
+        }
     }
 }
 
