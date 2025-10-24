@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use core::convert::Infallible;
 use core::fmt::Debug;
 use embedded_graphics::draw_target::DrawTarget;
@@ -30,6 +31,11 @@ use crate::config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 const TEXT_STYLE: MonoTextStyle<Rgb565> = MonoTextStyle::new(&FONT, Rgb565::WHITE);
 const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor::WHITE, 2);
 
+// Strip buffer configuration for DRAM optimization
+// 60 lines × 536 width × 2 bytes = 64,320 bytes (fits in 73KB DRAM heap)
+const STRIP_HEIGHT: usize = 60;
+const NUM_STRIPS: usize = (DISPLAY_HEIGHT as usize + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
+
 pub type MipiDisplayWrapper<'a> = MipiDisplay<
     SpiInterface<
         'a,
@@ -46,14 +52,20 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
 
 pub struct Display {
     display: MipiDisplayWrapper<'static>,
-    front_buffer: Vec<Rgb565>,
-    back_buffer: Vec<Rgb565>,
+    // DRAM strip buffer for fast drawing (536 × 60 × 2 = 64,320 bytes in DRAM heap)
+    strip_buffer: Box<[Rgb565]>,
+    // PSRAM framebuffer for DMA transfer to display (536 × 240 × 2 = 257,280 bytes in PSRAM)
+    framebuffer: Vec<Rgb565>,
+    // Pending primitives to be rendered in strips
+    pending_lines: Vec<(Point, Point)>,
+    pending_text: Vec<(alloc::string::String, Point)>,
 }
 
 struct BufferDrawTarget<'a> {
     buffer: &'a mut [Rgb565],
     width: usize,
     height: usize,
+    y_offset: i32, // Vertical offset for strip rendering
 }
 
 impl<'a> DrawTarget for BufferDrawTarget<'a> {
@@ -65,12 +77,15 @@ impl<'a> DrawTarget for BufferDrawTarget<'a> {
         I: IntoIterator<Item = Pixel<Self::Color>>,
     {
         for Pixel(coord, color) in pixels {
+            // Adjust coordinates for strip offset
+            let adjusted_y = coord.y - self.y_offset;
+
             if coord.x >= 0
                 && coord.x < self.width as i32
-                && coord.y >= 0
-                && coord.y < self.height as i32
+                && adjusted_y >= 0
+                && adjusted_y < self.height as i32
             {
-                let index = (coord.y as usize) * self.width + coord.x as usize;
+                let index = (adjusted_y as usize) * self.width + coord.x as usize;
                 if index < self.buffer.len() {
                     self.buffer[index] = color;
                 }
@@ -185,17 +200,21 @@ impl Display {
             .unwrap();
 
         let buffer_size = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize);
+        let strip_size = (DISPLAY_WIDTH as usize) * STRIP_HEIGHT;
 
-        // Both buffers in PSRAM (256KB each - too large for DRAM)
-        let mut front_buffer = Vec::new();
-        front_buffer.resize(buffer_size, Rgb565::BLACK);
-        let mut back_buffer = Vec::new();
-        back_buffer.resize(buffer_size, Rgb565::BLACK);
+        // Strip buffer in DRAM heap (64,320 bytes - fast writes!)
+        let strip_buffer = alloc::vec![Rgb565::BLACK; strip_size].into_boxed_slice();
+
+        // Full framebuffer in PSRAM (257,280 bytes - for DMA transfer)
+        let mut framebuffer = Vec::new();
+        framebuffer.resize(buffer_size, Rgb565::BLACK);
 
         Ok(Self {
             display,
-            front_buffer,
-            back_buffer,
+            strip_buffer,
+            framebuffer,
+            pending_lines: Vec::new(),
+            pending_text: Vec::new(),
         })
     }
 }
@@ -204,39 +223,76 @@ impl DisplayTrait for Display {
     type Error = DisplayError;
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
-        let mut target = BufferDrawTarget {
-            buffer: &mut self.back_buffer[..],
-            width: DISPLAY_WIDTH as usize,
-            height: DISPLAY_HEIGHT as usize,
-        };
-        Text::with_baseline(text, position, TEXT_STYLE, Baseline::Top).draw(&mut target)?;
+        // Queue text for deferred rendering
+        self.pending_text.push((alloc::string::String::from(text), position));
         Ok(())
     }
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
-        let mut target = BufferDrawTarget {
-            buffer: &mut self.back_buffer[..],
-            width: DISPLAY_WIDTH as usize,
-            height: DISPLAY_HEIGHT as usize,
-        };
-        Line::new(start, end)
-            .into_styled(LINE_STYLE)
-            .draw(&mut target)?;
+        // Queue line for deferred rendering
+        self.pending_lines.push((start, end));
         Ok(())
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        // Send front_buffer to display (use copied() for zero-cost iteration)
+        // Render all pending primitives in strips
+        for strip_idx in 0..NUM_STRIPS {
+            let strip_y_start = (strip_idx * STRIP_HEIGHT) as i32;
+            let strip_y_end = ((strip_idx + 1) * STRIP_HEIGHT).min(DISPLAY_HEIGHT as usize) as i32;
+
+            // Clear strip buffer (DRAM - fast!)
+            self.strip_buffer.fill(Rgb565::BLACK);
+
+            // Create draw target for this strip
+            let mut target = BufferDrawTarget {
+                buffer: &mut self.strip_buffer[..],
+                width: DISPLAY_WIDTH as usize,
+                height: STRIP_HEIGHT,
+                y_offset: strip_y_start,
+            };
+
+            // Draw all pending lines that intersect this strip
+            for &(start, end) in &self.pending_lines {
+                // Simple bounding box check - draw if line might intersect strip
+                let min_y = start.y.min(end.y);
+                let max_y = start.y.max(end.y);
+
+                if max_y >= strip_y_start && min_y < strip_y_end {
+                    Line::new(start, end)
+                        .into_styled(LINE_STYLE)
+                        .draw(&mut target)?;
+                }
+            }
+
+            // Draw all pending text that intersects this strip
+            for (text, position) in &self.pending_text {
+                // Approximate text height (font is 20 pixels tall)
+                if position.y >= strip_y_start - 20 && position.y < strip_y_end {
+                    Text::with_baseline(text.as_str(), *position, TEXT_STYLE, Baseline::Top)
+                        .draw(&mut target)?;
+                }
+            }
+
+            // Copy strip from DRAM to PSRAM framebuffer
+            let strip_height = (strip_y_end - strip_y_start) as usize;
+            let strip_start = (strip_y_start as usize) * (DISPLAY_WIDTH as usize);
+            let strip_len = strip_height * (DISPLAY_WIDTH as usize);
+            self.framebuffer[strip_start..strip_start + strip_len]
+                .copy_from_slice(&self.strip_buffer[..strip_len]);
+        }
+
+        // Clear pending primitives
+        self.pending_lines.clear();
+        self.pending_text.clear();
+
+        // Send complete framebuffer to display (use copied() for zero-cost iteration)
         self.display.set_pixels(
             0,
             0,
             DISPLAY_WIDTH - 1,
             DISPLAY_HEIGHT - 1,
-            self.front_buffer.iter().copied(),
+            self.framebuffer.iter().copied(),
         )?;
-
-        // Swap buffers
-        core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
 
         Ok(())
     }
