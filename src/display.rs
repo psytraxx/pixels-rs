@@ -238,7 +238,6 @@ impl DisplayTrait for Display {
         // Swap buffers
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
 
-        // Clear happens at the start of next frame (see clear_buffer method)
         Ok(())
     }
 }
