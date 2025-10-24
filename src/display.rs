@@ -51,7 +51,7 @@ pub struct Display {
 }
 
 struct BufferDrawTarget<'a> {
-    buffer: &'a mut Vec<Rgb565>,
+    buffer: &'a mut [Rgb565],
     width: usize,
     height: usize,
 }
@@ -185,6 +185,8 @@ impl Display {
             .unwrap();
 
         let buffer_size = (DISPLAY_WIDTH as usize) * (DISPLAY_HEIGHT as usize);
+
+        // Both buffers in PSRAM (256KB each - too large for DRAM)
         let mut front_buffer = Vec::new();
         front_buffer.resize(buffer_size, Rgb565::BLACK);
         let mut back_buffer = Vec::new();
@@ -203,7 +205,7 @@ impl DisplayTrait for Display {
 
     fn write(&mut self, text: &str, position: Point) -> Result<(), Self::Error> {
         let mut target = BufferDrawTarget {
-            buffer: &mut self.back_buffer,
+            buffer: &mut self.back_buffer[..],
             width: DISPLAY_WIDTH as usize,
             height: DISPLAY_HEIGHT as usize,
         };
@@ -213,7 +215,7 @@ impl DisplayTrait for Display {
 
     fn draw_line(&mut self, start: Point, end: Point) -> Result<(), Self::Error> {
         let mut target = BufferDrawTarget {
-            buffer: &mut self.back_buffer,
+            buffer: &mut self.back_buffer[..],
             width: DISPLAY_WIDTH as usize,
             height: DISPLAY_HEIGHT as usize,
         };
@@ -224,19 +226,27 @@ impl DisplayTrait for Display {
     }
 
     fn update_with_buffer(&mut self) -> Result<(), Self::Error> {
-        // Send front_buffer to display
+        // Send front_buffer to display (use copied() for zero-cost iteration)
         self.display.set_pixels(
             0,
             0,
             DISPLAY_WIDTH - 1,
             DISPLAY_HEIGHT - 1,
-            self.front_buffer.iter().cloned(),
+            self.front_buffer.iter().copied(),
         )?;
+
         // Swap buffers
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
-        // Clear back buffer
-        self.back_buffer.fill(Rgb565::BLACK);
+
+        // Clear happens at the start of next frame (see clear_buffer method)
         Ok(())
+    }
+}
+
+impl Display {
+    /// Clears the back buffer - call this at the start of each frame
+    pub fn clear_buffer(&mut self) {
+        self.back_buffer.fill(Rgb565::BLACK);
     }
 }
 

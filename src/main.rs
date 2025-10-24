@@ -6,9 +6,8 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use alloc::string::String;
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use core::{cell::RefCell, fmt::Write};
+use core::cell::RefCell;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
 use embedded_graphics::prelude::Point;
@@ -118,12 +117,17 @@ fn main() -> ! {
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
-    let mut text_x: u16 = 0;
+
+    // Pre-allocated buffer for FPS text to avoid allocations every frame
+    let mut fps_buffer = [0u8; 16];
 
     // Pre-calculate the constant automatic rotation quaternion
     let q_auto = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
 
     loop {
+        // Clear buffer at start of frame (optimization: clear before rendering instead of after swap)
+        display.clear_buffer();
+
         // FPS calculation and display
         let current_time = Instant::now().duration_since_epoch().as_millis();
 
@@ -207,15 +211,37 @@ fn main() -> ! {
 
         let ms_per_frame = current_time - last_time;
         if ms_per_frame > 0 {
-            let mut text = String::with_capacity(16);
-            write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
+            // Use pre-allocated buffer and format FPS text without heap allocation
+            let fps = 1000 / ms_per_frame;
+            let mut cursor = 0;
+            let prefix = b"FPS: ";
+            fps_buffer[..prefix.len()].copy_from_slice(prefix);
+            cursor += prefix.len();
 
+            // Format the number manually to avoid allocation
+            let mut num = fps;
+            let mut digits = [0u8; 10];
+            let mut digit_count = 0;
+            if num == 0 {
+                digits[0] = b'0';
+                digit_count = 1;
+            } else {
+                while num > 0 {
+                    digits[digit_count] = b'0' + (num % 10) as u8;
+                    num /= 10;
+                    digit_count += 1;
+                }
+            }
+            // Reverse digits into buffer
+            for i in 0..digit_count {
+                fps_buffer[cursor] = digits[digit_count - 1 - i];
+                cursor += 1;
+            }
+
+            let text = core::str::from_utf8(&fps_buffer[..cursor]).unwrap();
             display
-                .write(&text, Point::new(text_x as i32, 0))
+                .write(text, Point::new(0, 0))
                 .expect("Write text failed");
-
-            // Update text position for scrolling effect using modulo
-            text_x = (text_x + 1) % DISPLAY_WIDTH;
         }
 
         last_time = current_time;
