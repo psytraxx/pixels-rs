@@ -45,8 +45,8 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
 >;
 
 const TILE_SIZE: u16 = 32; // 32x32 pixel tiles
-const TILES_X: usize = ((DISPLAY_WIDTH + TILE_SIZE - 1) / TILE_SIZE) as usize; // 17 tiles wide
-const TILES_Y: usize = ((DISPLAY_HEIGHT + TILE_SIZE - 1) / TILE_SIZE) as usize; // 8 tiles high
+const TILES_X: usize = DISPLAY_WIDTH.div_ceil(TILE_SIZE) as usize; // 17 tiles wide
+const TILES_Y: usize = DISPLAY_HEIGHT.div_ceil(TILE_SIZE) as usize; // 8 tiles high
 const TOTAL_TILES: usize = TILES_X * TILES_Y; // 136 tiles total
 
 pub struct Display {
@@ -309,7 +309,8 @@ impl DisplayTrait for Display {
             for tile_x in 0..=TILES_X {
                 let tile_idx = tile_y * TILES_X + tile_x;
                 let is_dirty = tile_x < TILES_X
-                    && (self.current_tiles.is_dirty(tile_idx) || self.prev_tiles.is_dirty(tile_idx));
+                    && (self.current_tiles.is_dirty(tile_idx)
+                        || self.prev_tiles.is_dirty(tile_idx));
 
                 if is_dirty {
                     // Start or continue batch
@@ -319,15 +320,18 @@ impl DisplayTrait for Display {
                 } else if let Some(start_x) = batch_start {
                     // End of batch - send accumulated tiles as one transfer
                     let x_start = (start_x * TILE_SIZE as usize) as u16;
-                    let x_end = ((tile_x * TILE_SIZE as usize).min(DISPLAY_WIDTH as usize) - 1) as u16;
+                    let x_end =
+                        ((tile_x * TILE_SIZE as usize).min(DISPLAY_WIDTH as usize) - 1) as u16;
                     let y_start = (tile_y * TILE_SIZE as usize) as u16;
-                    let y_end = (((tile_y + 1) * TILE_SIZE as usize).min(DISPLAY_HEIGHT as usize) - 1) as u16;
+                    let y_end = (((tile_y + 1) * TILE_SIZE as usize).min(DISPLAY_HEIGHT as usize)
+                        - 1) as u16;
 
                     let batch_width = (x_end - x_start + 1) as usize;
 
                     // Create iterator for batched tiles
                     let batch_pixels = (y_start..=y_end).flat_map(|y| {
-                        let row_start = (y as usize) * (DISPLAY_WIDTH as usize) + (x_start as usize);
+                        let row_start =
+                            (y as usize) * (DISPLAY_WIDTH as usize) + (x_start as usize);
                         self.front_buffer[row_start..row_start + batch_width]
                             .iter()
                             .copied()
