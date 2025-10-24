@@ -302,30 +302,43 @@ impl DisplayTrait for Display {
         // Swap buffers FIRST so front_buffer has the newly drawn frame
         core::mem::swap(&mut self.front_buffer, &mut self.back_buffer);
 
-        // Update each dirty tile (union of current and previous)
-        for tile_idx in 0..TOTAL_TILES {
-            if self.current_tiles.is_dirty(tile_idx) || self.prev_tiles.is_dirty(tile_idx) {
-                let tile_x = (tile_idx % TILES_X) as u16;
-                let tile_y = (tile_idx / TILES_X) as u16;
+        // Batch adjacent dirty tiles horizontally to reduce DMA transfers
+        for tile_y in 0..TILES_Y {
+            let mut batch_start: Option<usize> = None;
 
-                let x_start = tile_x * TILE_SIZE;
-                let y_start = tile_y * TILE_SIZE;
-                let x_end = (x_start + TILE_SIZE - 1).min(DISPLAY_WIDTH - 1);
-                let y_end = (y_start + TILE_SIZE - 1).min(DISPLAY_HEIGHT - 1);
+            for tile_x in 0..=TILES_X {
+                let tile_idx = tile_y * TILES_X + tile_x;
+                let is_dirty = tile_x < TILES_X
+                    && (self.current_tiles.is_dirty(tile_idx) || self.prev_tiles.is_dirty(tile_idx));
 
-                let tile_width = (x_end - x_start + 1) as usize;
+                if is_dirty {
+                    // Start or continue batch
+                    if batch_start.is_none() {
+                        batch_start = Some(tile_x);
+                    }
+                } else if let Some(start_x) = batch_start {
+                    // End of batch - send accumulated tiles as one transfer
+                    let x_start = (start_x * TILE_SIZE as usize) as u16;
+                    let x_end = ((tile_x * TILE_SIZE as usize).min(DISPLAY_WIDTH as usize) - 1) as u16;
+                    let y_start = (tile_y * TILE_SIZE as usize) as u16;
+                    let y_end = (((tile_y + 1) * TILE_SIZE as usize).min(DISPLAY_HEIGHT as usize) - 1) as u16;
 
-                // Create iterator for this tile's pixels
-                let tile_pixels = (y_start..=y_end).flat_map(|y| {
-                    let row_start = (y as usize) * (DISPLAY_WIDTH as usize) + (x_start as usize);
-                    self.front_buffer[row_start..row_start + tile_width]
-                        .iter()
-                        .copied()
-                });
+                    let batch_width = (x_end - x_start + 1) as usize;
 
-                // Send tile to display
-                self.display
-                    .set_pixels(x_start, y_start, x_end, y_end, tile_pixels)?;
+                    // Create iterator for batched tiles
+                    let batch_pixels = (y_start..=y_end).flat_map(|y| {
+                        let row_start = (y as usize) * (DISPLAY_WIDTH as usize) + (x_start as usize);
+                        self.front_buffer[row_start..row_start + batch_width]
+                            .iter()
+                            .copied()
+                    });
+
+                    // Send batched region to display
+                    self.display
+                        .set_pixels(x_start, y_start, x_end, y_end, batch_pixels)?;
+
+                    batch_start = None;
+                }
             }
         }
 
