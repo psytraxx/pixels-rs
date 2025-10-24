@@ -6,17 +6,14 @@
     holding buffers for the duration of a data transfer."
 )]
 
-use alloc::string::String;
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use core::{cell::RefCell, fmt::Write};
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
+use embassy_executor::Spawner;
 use embedded_graphics::prelude::Point;
-use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
 use esp_hal::gpio::{InputConfig, Level, Output, OutputConfig, Pull};
-use esp_hal::main;
 use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
@@ -37,8 +34,8 @@ const FOV: f32 = 200.0; // Field of View
 const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
-#[main]
-fn main() -> ! {
+#[esp_rtos::main]
+async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
@@ -53,8 +50,6 @@ fn main() -> ! {
         .unwrap()
         .with_sda(peripherals.GPIO3)
         .with_scl(peripherals.GPIO2);
-
-    let i2c_ref_cell = RefCell::new(i2c);
 
     let display_peripherals = DisplayPeripherals {
         sck: peripherals.GPIO47,
@@ -73,7 +68,9 @@ fn main() -> ! {
     pmicen.set_high();
     info!("PMICEN set high");
 
-    let mut display = Display::new(display_peripherals).expect("Display init failed");
+    let mut display = Display::new(display_peripherals)
+        .await
+        .expect("Display init failed");
 
     info!("Display initialized!");
 
@@ -112,13 +109,15 @@ fn main() -> ! {
 
     // initalize touchpad
     let touch_int = peripherals.GPIO21;
-    let touch_int = Input::new(touch_int, InputConfig::default().with_pull(Pull::None));
+    let touch_int = Input::new(touch_int, InputConfig::default().with_pull(Pull::Up));
 
-    let mut touchpad = CST816x::new(RefCellDevice::new(&i2c_ref_cell), touch_int);
+    let mut touchpad = CST816x::new(i2c, touch_int);
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
-    let mut text_x: u16 = 0;
+
+    // Pre-allocated buffer for FPS text to avoid allocations every frame
+    let mut fps_buffer = [0u8; 16];
 
     // Pre-calculate the constant automatic rotation quaternion
     let q_auto = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), ROTATION_SPEED);
@@ -207,21 +206,44 @@ fn main() -> ! {
 
         let ms_per_frame = current_time - last_time;
         if ms_per_frame > 0 {
-            let mut text = String::with_capacity(16);
-            write!(text, "FPS: {}", 1000 / ms_per_frame).expect("Write failed");
+            // Use pre-allocated buffer and format FPS text without heap allocation
+            let fps = 1000 / ms_per_frame;
+            let mut cursor = 0;
+            let prefix = b"FPS: ";
+            fps_buffer[..prefix.len()].copy_from_slice(prefix);
+            cursor += prefix.len();
 
+            // Format the number manually to avoid allocation
+            let mut num = fps;
+            let mut digits = [0u8; 10];
+            let mut digit_count = 0;
+            if num == 0 {
+                digits[0] = b'0';
+                digit_count = 1;
+            } else {
+                while num > 0 {
+                    digits[digit_count] = b'0' + (num % 10) as u8;
+                    num /= 10;
+                    digit_count += 1;
+                }
+            }
+            // Reverse digits into buffer
+            for i in 0..digit_count {
+                fps_buffer[cursor] = digits[digit_count - 1 - i];
+                cursor += 1;
+            }
+
+            let text = core::str::from_utf8(&fps_buffer[..cursor]).unwrap();
             display
-                .write(&text, Point::new(text_x as i32, 0))
+                .write(text, Point::new(0, 0))
                 .expect("Write text failed");
-
-            // Update text position for scrolling effect using modulo
-            text_x = (text_x + 1) % DISPLAY_WIDTH;
         }
 
         last_time = current_time;
 
         display
             .update_with_buffer()
+            .await
             .expect("Update with buffer failed");
     }
 }
