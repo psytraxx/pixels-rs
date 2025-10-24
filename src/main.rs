@@ -10,6 +10,7 @@ use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use core::cell::RefCell;
 use display::{Display, DisplayPeripherals, DisplayTrait};
 use drivers::cst816x::{CST816x, Event};
+use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Point;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_alloc::psram_allocator;
@@ -20,7 +21,7 @@ use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
 use log::info;
-use micromath::{vector::F32x3, Quaternion};
+use micromath::{vector::F32x3, F32Ext, Quaternion};
 
 extern crate alloc;
 
@@ -89,7 +90,7 @@ fn main() -> ! {
     ];
 
     // Define cube edges (pairs of vertex indices)
-    let edges = [
+    let cube_edges = [
         (0, 1),
         (1, 2),
         (2, 3),
@@ -103,6 +104,26 @@ fn main() -> ! {
         (2, 6),
         (3, 7), // Connecting edges
     ];
+
+    // Particle system
+    const MAX_PARTICLES: usize = 200;
+    const EMISSION_RATE: usize = 3; // Particles per frame
+    const PARTICLE_SPEED: f32 = 0.02;
+
+    #[derive(Copy, Clone)]
+    struct Particle {
+        pos: F32x3,
+        vel: F32x3,
+        active: bool,
+        color: Rgb565,
+    }
+
+    let mut particles = [Particle {
+        pos: F32x3::from((0.0, 0.0, 0.0)),
+        vel: F32x3::from((0.0, 0.0, 0.0)),
+        active: false,
+        color: Rgb565::WHITE,
+    }; MAX_PARTICLES];
 
     let mut rotation = Quaternion::IDENTITY;
     let mut last_time = 0;
@@ -173,8 +194,78 @@ fn main() -> ! {
         // Apply pre-calculated automatic rotation
         rotation = q_auto * rotation;
 
-        // Transform and project vertices
-        let mut transformed_vertices = [(0i32, 0i32); 8]; // Fixed size array
+        // Emit new particles from center
+        for _ in 0..EMISSION_RATE {
+            // Find an inactive particle slot
+            if let Some(p) = particles.iter_mut().find(|p| !p.active) {
+                // Simple pseudo-random using time
+                let t = current_time as f32;
+                let rand_x = ((t * 0.123) % 1.0) * 2.0 - 1.0;
+                let rand_y = ((t * 0.456) % 1.0) * 2.0 - 1.0;
+                let rand_z = ((t * 0.789) % 1.0) * 2.0 - 1.0;
+
+                // Normalize direction and apply speed
+                let len = (rand_x * rand_x + rand_y * rand_y + rand_z * rand_z).sqrt();
+                let vel = if len > 0.01 {
+                    F32x3::from((
+                        rand_x / len * PARTICLE_SPEED,
+                        rand_y / len * PARTICLE_SPEED,
+                        rand_z / len * PARTICLE_SPEED,
+                    ))
+                } else {
+                    F32x3::from((PARTICLE_SPEED, 0.0, 0.0))
+                };
+
+                // Generate random color
+                let color_seed = (t * 0.321) % 1.0;
+                let color = if color_seed < 0.166 {
+                    Rgb565::RED
+                } else if color_seed < 0.333 {
+                    Rgb565::GREEN
+                } else if color_seed < 0.5 {
+                    Rgb565::BLUE
+                } else if color_seed < 0.666 {
+                    Rgb565::YELLOW
+                } else if color_seed < 0.833 {
+                    Rgb565::CYAN
+                } else {
+                    Rgb565::MAGENTA
+                };
+
+                p.pos = F32x3::from((0.0, 0.0, 0.0)); // Emit from center
+                p.vel = vel;
+                p.active = true;
+                p.color = color;
+            }
+        }
+
+        // Update particles
+        for p in particles.iter_mut() {
+            if p.active {
+                // Update position
+                p.pos.x += p.vel.x;
+                p.pos.y += p.vel.y;
+                p.pos.z += p.vel.z;
+
+                // Constrain to cube boundaries and bounce
+                if p.pos.x > 1.0 || p.pos.x < -1.0 {
+                    p.vel.x = -p.vel.x;
+                    p.pos.x = p.pos.x.clamp(-1.0, 1.0);
+                }
+                if p.pos.y > 1.0 || p.pos.y < -1.0 {
+                    p.vel.y = -p.vel.y;
+                    p.pos.y = p.pos.y.clamp(-1.0, 1.0);
+                }
+                if p.pos.z > 1.0 || p.pos.z < -1.0 {
+                    p.vel.z = -p.vel.z;
+                    p.pos.z = p.pos.z.clamp(-1.0, 1.0);
+                }
+            }
+        }
+
+        // Render CUBE at center
+        let cube_offset_x = 0; // Centered
+        let mut cube_transformed = [(0i32, 0i32); 8];
 
         for (i, &v) in cube_vertices.iter().enumerate() {
             let rotated = rotation.rotate(v);
@@ -182,30 +273,55 @@ fn main() -> ! {
             let y = rotated.y;
             let z = rotated.z + PROJECTION_DISTANCE;
 
-            // Perspective projection with check for division by near-zero z
             let projected_point = if z.abs() > 0.01 {
-                // Avoid division if z is too close to the camera plane
-                let inv_z = 1.0 / z; // Calculate inverse z once
-                let px = (x * FOV * inv_z) as i32 + half_width;
+                let inv_z = 1.0 / z;
+                let px = (x * FOV * inv_z) as i32 + half_width + cube_offset_x;
                 let py = (y * FOV * inv_z) as i32 + half_height;
                 (px, py)
             } else {
-                // Point is too close or behind the camera, mark as invalid
-                (i32::MAX, i32::MAX) // Use MAX as an indicator for clipping/invalid point
+                (i32::MAX, i32::MAX)
             };
-            transformed_vertices[i] = projected_point;
+            cube_transformed[i] = projected_point;
         }
 
-        // Draw edges
-        for &(start, end) in &edges {
-            let p1 = transformed_vertices[start];
-            let p2 = transformed_vertices[end];
+        // Draw cube edges
+        for &(start, end) in &cube_edges {
+            let p1 = cube_transformed[start];
+            let p2 = cube_transformed[end];
 
-            // Only draw the line if both points are valid (not projected off-screen)
             if p1.0 != i32::MAX && p2.0 != i32::MAX {
                 let begin = Point::new(p1.0, p1.1);
                 let end = Point::new(p2.0, p2.1);
                 display.draw_line(begin, end).expect("Draw line failed");
+            }
+        }
+
+        // Render particles
+        for p in particles.iter() {
+            if p.active {
+                // Apply rotation to particle position
+                let rotated = rotation.rotate(p.pos);
+                let x = rotated.x;
+                let y = rotated.y;
+                let z = rotated.z + PROJECTION_DISTANCE;
+
+                // Project to screen
+                if z.abs() > 0.01 {
+                    let inv_z = 1.0 / z;
+                    let px = (x * FOV * inv_z) as i32 + half_width;
+                    let py = (y * FOV * inv_z) as i32 + half_height;
+
+                    // Draw particle as colored point
+                    if px >= 1
+                        && px < DISPLAY_WIDTH as i32 - 1
+                        && py >= 1
+                        && py < DISPLAY_HEIGHT as i32 - 1
+                    {
+                        display
+                            .draw_colored_point(Point::new(px, py), p.color)
+                            .expect("Draw particle failed");
+                    }
+                }
             }
         }
 

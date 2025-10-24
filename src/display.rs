@@ -355,6 +355,36 @@ impl DisplayTrait for Display {
 }
 
 impl Display {
+    /// Draws a small colored point (3x3 pixels) at the specified position
+    pub fn draw_colored_point(&mut self, position: Point, color: Rgb565) -> Result<(), DisplayError> {
+        use embedded_graphics::primitives::{Rectangle, PrimitiveStyleBuilder};
+        use embedded_graphics::Drawable;
+
+        let style = PrimitiveStyleBuilder::new()
+            .fill_color(color)
+            .build();
+
+        let mut target = BufferDrawTarget {
+            buffer: &mut self.back_buffer[..],
+            width: DISPLAY_WIDTH as usize,
+            height: DISPLAY_HEIGHT as usize,
+        };
+
+        // Draw 3x3 rectangle
+        let x = position.x.saturating_sub(1).max(0) as u16;
+        let y = position.y.saturating_sub(1).max(0) as u16;
+        let x2 = (position.x + 1).min(DISPLAY_WIDTH as i32 - 1) as u16;
+        let y2 = (position.y + 1).min(DISPLAY_HEIGHT as i32 - 1) as u16;
+
+        self.current_tiles.mark_rect(x, y, x2, y2);
+
+        Rectangle::new(position - Point::new(1, 1), Size::new(3, 3))
+            .into_styled(style)
+            .draw(&mut target)?;
+
+        Ok(())
+    }
+
     /// Clears only the dirty tiles of the back buffer - call this at the start of each frame
     pub fn clear_buffer(&mut self) {
         // Clear tiles that were dirty 2 frames ago
