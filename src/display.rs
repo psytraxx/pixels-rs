@@ -356,13 +356,15 @@ impl DisplayTrait for Display {
 
 impl Display {
     /// Draws a small colored point (3x3 pixels) at the specified position
-    pub fn draw_colored_point(&mut self, position: Point, color: Rgb565) -> Result<(), DisplayError> {
-        use embedded_graphics::primitives::{Rectangle, PrimitiveStyleBuilder};
+    pub fn draw_colored_point(
+        &mut self,
+        position: Point,
+        color: Rgb565,
+    ) -> Result<(), DisplayError> {
+        use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
         use embedded_graphics::Drawable;
 
-        let style = PrimitiveStyleBuilder::new()
-            .fill_color(color)
-            .build();
+        let style = PrimitiveStyleBuilder::new().fill_color(color).build();
 
         let mut target = BufferDrawTarget {
             buffer: &mut self.back_buffer[..],
