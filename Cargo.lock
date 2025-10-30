@@ -193,7 +193,7 @@ dependencies = [
 [[package]]
 name = "drivers"
 version = "0.1.0"
-source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?tag=v0.10.0#51672ac7095d6a5fb990a6f667a9b02cf0979233"
+source = "git+https://github.com/psytraxx/s3-display-amoled-touch-rs.git?tag=v0.10.1#43f32dcd9e68d859d9f2cfa993bf606fe65bfc79"
 dependencies = [
  "bitflags",
  "embedded-hal 1.0.0",
