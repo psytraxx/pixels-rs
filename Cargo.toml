@@ -38,8 +38,9 @@ embassy-futures = { version = "0.1.1" }
 
 #switch to official mipi-dsi crate when newer version that 0.9.0 is released
 mipidsi = { git = "https://github.com/almindor/mipidsi.git", branch = "master" }
-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.14.1", package="drivers", features = [
-    "log-04", "async"
+drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.14.1", package = "drivers", features = [
+    "log-04",
+    "async",
 ] }
 embedded-graphics = { version = "0.8.1", features = [] }
 embedded-hal = { version = "1.0.0", features = [] }

@@ -18,4 +18,12 @@
     ],
     "automerge": true
   }
+  ,
+  "packageRules": [
+    {
+      "matchDatasources": ["git"],
+      "matchPackagePatterns": ["^https://github.com/psytraxx/"],
+      "enabled": false
+    }
+  ]
 }
