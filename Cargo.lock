@@ -1010,6 +1010,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lcd-async"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "362f088c5c176ceedd4d0e817d17ae3b79480495deac605158a7cd86450450c5"
+dependencies = [
+ "embedded-graphics",
+ "embedded-graphics-core",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.180"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1050,16 +1062,6 @@ name = "micromath"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3c8dda44ff03a2f238717214da50f65d5a53b45cd213a7370424ffdb6fae815"
-
-[[package]]
-name = "mipidsi"
-version = "0.9.0"
-source = "git+https://github.com/almindor/mipidsi.git?branch=master#6661d005daebaf00ed3dea003094ec55a77a3cc8"
-dependencies = [
- "embedded-graphics-core",
- "embedded-hal 1.0.0",
- "heapless 0.8.0",
-]
 
 [[package]]
 name = "nb"
@@ -1153,9 +1155,9 @@ dependencies = [
  "esp-hal",
  "esp-println",
  "esp-rtos",
+ "lcd-async",
  "log",
  "micromath",
- "mipidsi",
  "num-traits",
  "static_cell",
 ]
