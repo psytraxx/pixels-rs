@@ -17,13 +17,16 @@
       "security"
     ],
     "automerge": true
-  }
-  ,
+  },
   "packageRules": [
     {
-      "matchDatasources": ["git"],
-      "matchPackagePatterns": ["^https://github.com/psytraxx/"],
-      "enabled": false
+      "matchDatasources": [
+        "git"
+      ],
+      "enabled": false,
+      "matchPackageNames": [
+        "/^https://github.com/psytraxx//"
+      ]
     }
   ]
 }
