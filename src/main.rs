@@ -7,10 +7,10 @@
 )]
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use drivers::cst816x::asynch::CST816xAsync;
-use embassy_time::Delay;
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use drivers::cst816x::{Event};
+use drivers::cst816x::asynch::CST816xAsync;
+use drivers::cst816x::Event;
+use embassy_time::Delay;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Point;
 use esp_alloc::psram_allocator;
@@ -42,7 +42,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
 
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 73744);
+    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 40960);
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0);
 
@@ -71,7 +71,9 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     pmicen.set_high();
     info!("PMICEN set high");
 
-    let mut display = Display::new(display_peripherals).expect("Display init failed");
+    let mut display = Display::new(display_peripherals)
+        .await
+        .expect("Display init failed");
 
     info!("Display initialized!");
 
@@ -134,7 +136,10 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     let rst: Option<Output<'static>> = None;
     let mut touchpad = CST816xAsync::new(i2c, touch_int, rst, Delay);
-    touchpad.begin().await.expect("Failed to initialize touchpad");
+    touchpad
+        .begin()
+        .await
+        .expect("Failed to initialize touchpad");
 
     let mut initial_touch_x: i32 = 0;
     let mut initial_touch_y: i32 = 0;
@@ -153,12 +158,12 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         let current_time = Instant::now().duration_since_epoch().as_millis();
 
         if let Ok(touch_event) = touchpad.read_touch().await {
-                match touch_event.event {
-                    Event::Down => {
+            match touch_event.event {
+                Event::Down => {
                     initial_touch_x = touch_event.x as i32;
                     initial_touch_y = touch_event.y as i32;
                     //println!("Touch Down at ({}, {})", initial_touch_x, initial_touch_y);
-                    }
+                }
                 Event::Up => {
                     // Touch Lift
                     //println!("Touch Lift at ({}, {})", touch_event.x, touch_event.y);
@@ -177,14 +182,14 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
                     let angle_x = (delta_y as f32) * ROTATION_SENSITIVITY; // Rotate around X-axis
 
                     // Create quaternions for the rotations
-                        let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
-                        let qy = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), angle_y);
+                    let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
+                    let qy = Quaternion::axis_angle(F32x3::from((0.0, 1.0, 0.0)), angle_y);
 
                     // Update the overall rotation
-                        rotation = qy * qx * rotation;
+                    rotation = qy * qx * rotation;
 
                     //println!("Applied rotation: {:?}", &rotation);
-                    }
+                }
                 _ => {
                     //ingore other touch events
                 }
@@ -192,7 +197,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
         }
 
         // Apply pre-calculated automatic rotation
-            rotation = q_auto * rotation;
+        rotation = q_auto * rotation;
 
         // Emit new particles from center
         for _ in 0..EMISSION_RATE {
@@ -364,6 +369,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
         display
             .update_with_buffer()
+            .await
             .expect("Update with buffer failed");
     }
 }
