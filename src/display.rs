@@ -3,8 +3,8 @@ use core::convert::Infallible;
 use core::fmt::Debug;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{OriginDimensions, Point, Size};
-use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::mono_font::iso_8859_1::FONT_10X20 as FONT;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Primitive;
 use embedded_graphics::primitives::{Line, PrimitiveStyle};
@@ -361,8 +361,8 @@ impl Display {
         position: Point,
         color: Rgb565,
     ) -> Result<(), DisplayError> {
-        use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
         use embedded_graphics::Drawable;
+        use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 
         let style = PrimitiveStyleBuilder::new().fill_color(color).build();
 

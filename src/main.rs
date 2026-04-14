@@ -8,8 +8,8 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use drivers::cst816x::asynch::CST816xAsync;
 use drivers::cst816x::Event;
+use drivers::cst816x::asynch::CST816xAsync;
 use embassy_time::Delay;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Point;
@@ -20,7 +20,7 @@ use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
 use log::info;
-use micromath::{vector::F32x3, F32Ext, Quaternion};
+use micromath::{F32Ext, Quaternion, vector::F32x3};
 
 extern crate alloc;
 
@@ -177,7 +177,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
                     // Calculate rotation angles based on touch movement
                     let angle_y = (delta_x as f32) * ROTATION_SENSITIVITY; // Rotate around Y-axis
-                    let angle_x = (delta_y as f32) * ROTATION_SENSITIVITY; // Rotate around X-axis
+                    let angle_x = (delta_y as f32) * -ROTATION_SENSITIVITY; // Rotate around X-axis
 
                     // Create quaternions for the rotations
                     let qx = Quaternion::axis_angle(F32x3::from((1.0, 0.0, 0.0)), angle_x);
