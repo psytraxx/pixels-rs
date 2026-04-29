@@ -8,14 +8,15 @@
 
 use config::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use display::{Display, DisplayPeripherals, DisplayTrait};
-use drivers::cst816x::Event;
-use drivers::cst816x::asynch::CST816xAsync;
+use drivers::cst816x::{CST816x, Event};
+use embassy_executor::Spawner;
 use embassy_time::Delay;
 use embedded_graphics::pixelcolor::{Rgb565, RgbColor};
 use embedded_graphics::prelude::Point;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
 use esp_hal::gpio::{InputConfig, Level, Output, OutputConfig, Pin, Pull};
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
@@ -37,7 +38,7 @@ const PROJECTION_DISTANCE: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.03;
 
 #[esp_rtos::main]
-async fn main(_spawner: embassy_executor::Spawner) -> ! {
+async fn main(_spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
 
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::_240MHz));
@@ -46,7 +47,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0);
 
-    esp_rtos::start(timer_group0.timer0);
+    let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timer_group0.timer0, sw_interrupt.software_interrupt0);
 
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
         .unwrap()
@@ -133,7 +135,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let touch_int = Input::new(touch_int, InputConfig::default().with_pull(Pull::None));
 
     let rst: Option<Output<'static>> = None;
-    let mut touchpad = CST816xAsync::new(i2c, touch_int, rst, Delay);
+    let mut touchpad = CST816x::new(i2c, touch_int, rst, Delay);
     touchpad
         .begin()
         .await

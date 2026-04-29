@@ -4,52 +4,27 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-esp-hal = { version = "1.0.0", features = [
-    "esp32s3",
-    "log-04",
-    "unstable",
-    "psram",
-] }
-
-esp-rtos = { version = "0.2.0", features = [
-    "embassy",
-    "esp-alloc",
-    "esp-radio",
-    "esp32s3",
-    "log-04",
-] }
-
-esp-bootloader-esp-idf = { version = "0.4.0", features = ["esp32s3", "log-04"] }
+esp-hal = { version = "1.1.0", features = ["esp32s3", "log-04", "unstable"] }
+esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "esp32s3", "log-04"] }
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32s3", "log-04"] }
 log = "0.4.28"
-
-embedded-io = "0.7.1"
-embedded-io-async = "0.7.0"
-esp-alloc = "0.9.0"
-esp-backtrace = { version = "0.18.1", features = [
-    "esp32s3",
-    "panic-handler",
-    "println",
-] }
-esp-println = { version = "0.16.1", features = ["esp32s3", "log-04"] }
-# for more networking protocol support see https://crates.io/crates/edge-net
-embassy-executor = { version = "0.9.1", features = ["log"] }
+esp-alloc = "0.10.0"
+esp-backtrace = { version = "0.19.0", features = ["esp32s3", "panic-handler", "println"] }
+esp-println = { version = "0.17.0", features = ["esp32s3", "log-04"] }
+embassy-executor = { version = "0.10.0", features = ["log"] }
 embassy-time = { version = "0.5.1", features = ["log"] }
-embassy-futures = { version = "0.1.1" }
-
 mipidsi = { version = "0.10.0" }
-drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.14.1", package = "drivers", features = [
-    "log-04",
-    "async",
-] }
+drivers = { git = "https://github.com/psytraxx/s3-display-amoled-touch-rs.git", tag = "v0.15.0", package = "drivers", features = ["log-04", "async"] }
 embedded-graphics = { version = "0.8.2", features = [] }
 embedded-hal = { version = "1.0.0", features = [] }
 micromath = { version = "2.1.0", features = ["vector", "quaternion"] }
 static_cell = { version = "2.1.1", features = ["nightly"] }
-embedded-hal-bus = { version = "0.3.0", features = ["async"] }
-num-traits = { version = "0.2.19", default-features = false, features = [
-    "libm",
-] }
-
+embedded-hal-bus = { version = "0.3.0" }
+embedded-hal-async = { version = "1.0.0" }
+embassy-futures = { version = "0.1.2", features = [] }
+embassy-sync = { version = "0.8.0", features = [] }
+embassy-embedded-hal = { version = "0.6.0", features = [] }
+num-traits = { version = "0.2.19", default-features = false, features = ["libm"] }
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization
