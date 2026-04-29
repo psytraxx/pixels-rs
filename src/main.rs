@@ -331,9 +331,7 @@ async fn main(_spawner: Spawner) -> ! {
         }
 
         let ms_per_frame = current_time - last_time;
-        if ms_per_frame > 0 {
-            // Use pre-allocated buffer and format FPS text without heap allocation
-            let fps = 1000 / ms_per_frame;
+        if let Some(fps) = 1000u64.checked_div(ms_per_frame) {
             let mut cursor = 0;
             let prefix = b"FPS: ";
             fps_buffer[..prefix.len()].copy_from_slice(prefix);
