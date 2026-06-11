@@ -44,7 +44,7 @@ This executes: `espflash flash -c esp32s3 -s 16mb -m dio -f 80mhz --no-skip --mo
 
 **Notes:**
 - Debug builds use optimization level 's' for reasonable embedded performance
-- Release builds use LTO 'fat' and optimization level 's' for size optimization
+- Release builds use LTO 'fat' and optimization level 3 for speed
 - The build requires `build-std = ["alloc", "core"]` for no_std target
 
 ## Architecture
@@ -62,7 +62,7 @@ This executes: `espflash flash -c esp32s3 -s 16mb -m dio -f 80mhz --no-skip --mo
 - **display.rs**: Advanced display abstraction with tile-based rendering
   - Wraps mipidsi RM67162 driver with custom SPI interface
   - Implements `DisplayTrait` for text, lines, and colored points
-  - Tile-based rendering system (32x32 pixel tiles, 136 total tiles)
+  - Tile-based rendering system (16x16 pixel tiles, 510 total tiles)
   - Dirty tile tracking with horizontal batching for DMA optimization
   - Double buffering with selective clearing
   - DMA transfers at 80 MHz SPI
@@ -74,7 +74,7 @@ This executes: `espflash flash -c esp32s3 -s 16mb -m dio -f 80mhz --no-skip --mo
 ### Key Architectural Patterns
 
 **Tile-Based Rendering:**
-The display is divided into 32x32 pixel tiles (17 tiles wide × 8 tiles high = 136 total). The system tracks which tiles are "dirty" (need updating) each frame using `TileTracker`:
+The display is divided into 16x16 pixel tiles (34 tiles wide × 15 tiles high = 510 total). The system tracks which tiles are "dirty" (need updating) each frame using `TileTracker`:
 - `current_tiles`: Tiles drawn to in the current frame
 - `prev_tiles`: Tiles that were dirty 2 frames ago (used for selective clearing)
 
@@ -97,8 +97,8 @@ This approach achieves 50-60 FPS (3.5× improvement over full-screen updates).
 **Memory Management:**
 - DRAM heap: 73,744 bytes for general allocations
 - PSRAM (octal mode): ~512KB for framebuffers (2 × 536 × 240 × 2 bytes)
-- DMA buffers: 32,000-byte static buffers (rx/tx) for SPI transfers
-- Display staging buffer: 512 bytes for command/data
+- DMA buffers: 32,000-byte TX buffer, 32-byte RX buffer (display is write-only)
+- Display staging buffer: 32,000 bytes, sized to match the DMA TX buffer so each flush is a single DMA transaction
 - Particle array: Stack-allocated (200 × ~32 bytes)
 
 **Rendering Pipeline:**
@@ -142,7 +142,7 @@ The `psram_allocator!` macro must be called after heap initialization to enable 
 GPIO38 (PMICEN) must be set high to enable the power management IC before display initialization.
 
 **DMA Configuration:**
-SPI DMA uses 32,000-byte buffers (rx/tx) created with `dma_buffers!` macro. The display staging buffer is 512 bytes, allocated in a static cell for 'static lifetime.
+SPI DMA uses a 32,000-byte TX buffer and a minimal 32-byte RX buffer (the display is write-only, but `DmaRxBuf` requires at least one descriptor) created with `dma_buffers!(32, 32000)`. The display staging buffer is 32,000 bytes, allocated in a static cell for 'static lifetime — it must match the DMA TX buffer size so mipidsi's `send_pixels` flushes in single large DMA transactions rather than 512-byte chunks.
 
 **SPI Driver in RAM:**
 `ESP_HAL_PLACE_SPI_DRIVER_IN_RAM = "true"` ensures SPI driver code is placed in RAM for performance.

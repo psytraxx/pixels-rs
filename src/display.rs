@@ -44,10 +44,10 @@ pub type MipiDisplayWrapper<'a> = MipiDisplay<
     Output<'a>,
 >;
 
-const TILE_SIZE: u16 = 32; // 32x32 pixel tiles
-const TILES_X: usize = DISPLAY_WIDTH.div_ceil(TILE_SIZE) as usize; // 17 tiles wide
-const TILES_Y: usize = DISPLAY_HEIGHT.div_ceil(TILE_SIZE) as usize; // 8 tiles high
-const TOTAL_TILES: usize = TILES_X * TILES_Y; // 136 tiles total
+const TILE_SIZE: u16 = 16; // 16x16 pixel tiles
+const TILES_X: usize = DISPLAY_WIDTH.div_ceil(TILE_SIZE) as usize; // 34 tiles wide
+const TILES_Y: usize = DISPLAY_HEIGHT.div_ceil(TILE_SIZE) as usize; // 15 tiles high
+const TOTAL_TILES: usize = TILES_X * TILES_Y; // 510 tiles total
 
 pub struct Display {
     display: MipiDisplayWrapper<'static>,
@@ -191,8 +191,10 @@ impl Display {
         let mosi = Output::new(p.mosi, Level::Low, OutputConfig::default());
         let cs = Output::new(p.cs, Level::High, OutputConfig::default());
 
+        // Display is write-only: SpiDmaBus::write never touches the RX buffer, but
+        // DmaRxBuf requires at least one descriptor, so use a minimal 32-byte buffer.
         #[allow(clippy::manual_div_ceil)]
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32, 32000);
         let dma_rx_buf = esp_hal::dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -214,9 +216,12 @@ impl Display {
         // Attach the SPI device using the chip-select control pin (no delay used)
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();
 
-        const DISPLAY_BUFFER_SIZE: usize = 512;
+        // Staging buffer for mipidsi's SpiInterface: send_pixels flushes via a blocking
+        // spi.write() each time this fills, so it must match the DMA TX buffer size to
+        // get one DMA transaction per flush instead of one per 256 pixels.
+        const DISPLAY_BUFFER_SIZE: usize = 32000;
         static DISPLAY_BUFFER: StaticCell<[u8; DISPLAY_BUFFER_SIZE]> = StaticCell::new();
-        let buffer = DISPLAY_BUFFER.init([0_u8; 512]);
+        let buffer = DISPLAY_BUFFER.init([0_u8; DISPLAY_BUFFER_SIZE]);
 
         // Create the SPI interface for the display driver using the SPI device, DC pin, and initialization buffer
         let di = SpiInterface::new(spi_device, dc, buffer);
