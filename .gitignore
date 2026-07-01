@@ -1,1 +1,6 @@
-/target
+build/
+sdkconfig
+sdkconfig.old
+dependencies.lock
+managed_components/
+.idf_build_apps.json

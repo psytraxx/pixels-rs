@@ -14,5 +14,6 @@
         "--message-format=json",
         "--target",
         "xtensa-esp32s3-none-elf"
-    ]
+    ],
+    "idf.currentSetup": "/Users/aywo@mediait.ch/.espressif/v5.5.4/esp-idf"
 }
