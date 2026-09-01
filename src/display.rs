@@ -12,13 +12,12 @@ use embedded_graphics::text::{Baseline, Text};
 use embedded_graphics::{Drawable, Pixel};
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::delay::Delay;
-use esp_hal::dma::DmaTxBuf;
-use esp_hal::dma_buffers;
 use esp_hal::gpio::{AnyPin, Level, Output, OutputConfig};
 use esp_hal::peripherals::{DMA_CH0, SPI2};
-use esp_hal::spi::master::{Config as SpiConfig, Spi, SpiDmaBus};
+use esp_hal::spi::master::{Config as SpiConfig, Spi, SpiDma};
 use esp_hal::spi::{Error, Mode};
 use esp_hal::time::Rate;
+use esp_hal::{dma_rx_buffer, dma_tx_buffer};
 use mipidsi::interface::{SpiError, SpiInterface};
 use mipidsi::models::RM67162;
 use mipidsi::options::{Orientation, Rotation};
@@ -33,11 +32,7 @@ const LINE_STYLE: PrimitiveStyle<Rgb565> = PrimitiveStyle::with_stroke(RgbColor:
 pub type MipiDisplayWrapper<'a> = MipiDisplay<
     SpiInterface<
         'a,
-        ExclusiveDevice<
-            SpiDmaBus<'a, esp_hal::Blocking>,
-            Output<'a>,
-            embedded_hal_bus::spi::NoDelay,
-        >,
+        ExclusiveDevice<SpiDma<'a, esp_hal::Blocking>, Output<'a>, embedded_hal_bus::spi::NoDelay>,
         Output<'a>,
     >,
     RM67162,
@@ -191,12 +186,10 @@ impl Display {
         let mosi = Output::new(p.mosi, Level::Low, OutputConfig::default());
         let cs = Output::new(p.cs, Level::High, OutputConfig::default());
 
-        // Display is write-only: SpiDmaBus::write never touches the RX buffer, but
+        // Display is write-only: SpiDma::write never touches the RX buffer, but
         // DmaRxBuf requires at least one descriptor, so use a minimal 32-byte buffer.
-        #[allow(clippy::manual_div_ceil)]
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32, 32000);
-        let dma_rx_buf = esp_hal::dma::DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let dma_rx_buf = dma_rx_buffer!(32).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(32000).unwrap();
 
         // Configure SPI
         let spi_dma = Spi::new(
@@ -208,10 +201,11 @@ impl Display {
         .unwrap()
         .with_sck(sck)
         .with_mosi(mosi)
-        .with_dma(p.dma);
+        .with_dma(p.dma)
+        .with_buffers(dma_rx_buf, dma_tx_buf);
 
-        // Create the SPI DMA bus with the configured buffers
-        let spi = SpiDmaBus::new(spi_dma, dma_rx_buf, dma_tx_buf);
+        // `SpiDma` implements `SpiBus` directly after `with_buffers`
+        let spi = spi_dma;
 
         // Attach the SPI device using the chip-select control pin (no delay used)
         let spi_device = ExclusiveDevice::new_no_delay(spi, cs).unwrap();

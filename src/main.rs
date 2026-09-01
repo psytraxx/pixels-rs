@@ -16,7 +16,6 @@ use embedded_graphics::prelude::Point;
 use esp_alloc::psram_allocator;
 use esp_backtrace as _;
 use esp_hal::gpio::{InputConfig, Level, Output, OutputConfig, Pin, Pull};
-use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::time::Instant;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::{clock::CpuClock, gpio::Input, i2c::master::I2c};
@@ -47,8 +46,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let timer_group0 = TimerGroup::new(peripherals.TIMG0);
 
-    let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timer_group0.timer0, sw_interrupt.software_interrupt0);
+    esp_rtos::start(timer_group0.timer0, peripherals.FROM_CPU_INTR0);
 
     let i2c = I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
         .unwrap()
