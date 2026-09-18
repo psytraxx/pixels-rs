@@ -123,6 +123,46 @@ async fn main(_spawner: Spawner) -> ! {
         color: Rgb565::WHITE,
     }; MAX_PARTICLES];
 
+    /// xorshift32. Deriving randomness from the frame timestamp instead gives every
+    /// particle emitted in a frame the same velocity and color, and `(t * k) % 1.0`
+    /// collapses once the millisecond counter passes 2^23 and the f32 step exceeds 1.0.
+    struct Rng(u32);
+
+    impl Rng {
+        fn next_u32(&mut self) -> u32 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 17;
+            self.0 ^= self.0 << 5;
+            self.0
+        }
+
+        /// Uniform in [-1, 1).
+        fn next_signed(&mut self) -> f32 {
+            let unit = (self.next_u32() >> 8) as f32 / (1u32 << 24) as f32;
+            unit * 2.0 - 1.0
+        }
+
+        fn next_below(&mut self, n: u32) -> u32 {
+            self.next_u32() % n
+        }
+    }
+
+    const PARTICLE_COLORS: [Rgb565; 6] = [
+        Rgb565::RED,
+        Rgb565::GREEN,
+        Rgb565::BLUE,
+        Rgb565::YELLOW,
+        Rgb565::CYAN,
+        Rgb565::MAGENTA,
+    ];
+
+    // Seed from boot time, forced nonzero: xorshift is stuck at zero.
+    let mut rng = Rng(
+        (Instant::now().duration_since_epoch().as_millis() as u32)
+            .wrapping_mul(2_654_435_761)
+            | 1,
+    );
+
     let mut rotation = Quaternion::IDENTITY;
     let mut last_time = 0;
     let half_width = (DISPLAY_WIDTH / 2) as i32;
@@ -201,11 +241,9 @@ async fn main(_spawner: Spawner) -> ! {
         for _ in 0..EMISSION_RATE {
             // Find an inactive particle slot
             if let Some(p) = particles.iter_mut().find(|p| !p.active) {
-                // Simple pseudo-random using time
-                let t = current_time as f32;
-                let rand_x = ((t * 0.123) % 1.0) * 2.0 - 1.0;
-                let rand_y = ((t * 0.456) % 1.0) * 2.0 - 1.0;
-                let rand_z = ((t * 0.789) % 1.0) * 2.0 - 1.0;
+                let rand_x = rng.next_signed();
+                let rand_y = rng.next_signed();
+                let rand_z = rng.next_signed();
 
                 // Normalize direction and apply speed
                 let len = (rand_x * rand_x + rand_y * rand_y + rand_z * rand_z).sqrt();
@@ -219,21 +257,7 @@ async fn main(_spawner: Spawner) -> ! {
                     F32x3::from((PARTICLE_SPEED, 0.0, 0.0))
                 };
 
-                // Generate random color
-                let color_seed = (t * 0.321) % 1.0;
-                let color = if color_seed < 0.166 {
-                    Rgb565::RED
-                } else if color_seed < 0.333 {
-                    Rgb565::GREEN
-                } else if color_seed < 0.5 {
-                    Rgb565::BLUE
-                } else if color_seed < 0.666 {
-                    Rgb565::YELLOW
-                } else if color_seed < 0.833 {
-                    Rgb565::CYAN
-                } else {
-                    Rgb565::MAGENTA
-                };
+                let color = PARTICLE_COLORS[rng.next_below(PARTICLE_COLORS.len() as u32) as usize];
 
                 p.pos = F32x3::from((0.0, 0.0, 0.0)); // Emit from center
                 p.vel = vel;
