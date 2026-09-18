@@ -283,11 +283,15 @@ impl DisplayTrait for Display {
             height: DISPLAY_HEIGHT as usize,
         };
 
-        // Mark tiles dirty (add small padding for 2-pixel stroke)
-        let x1 = start.x.max(0).saturating_sub(2) as u16;
-        let y1 = start.y.max(0).saturating_sub(2) as u16;
-        let x2 = (end.x.max(0) + 2).min(DISPLAY_WIDTH as i32 - 1) as u16;
-        let y2 = (end.y.max(0) + 2).min(DISPLAY_HEIGHT as i32 - 1) as u16;
+        // Mark tiles dirty, padding for the 2-pixel stroke. Order the endpoints before
+        // padding: applying -2 to `start` and +2 to `end` puts both pads inside the span
+        // whenever the line runs right-to-left or bottom-to-top, so the box comes out 2px
+        // short on each side and the stroke leaves residue on the trailing edge.
+        const PAD: i32 = 2;
+        let x1 = (start.x.min(end.x) - PAD).max(0) as u16;
+        let y1 = (start.y.min(end.y) - PAD).max(0) as u16;
+        let x2 = (start.x.max(end.x) + PAD).clamp(0, DISPLAY_WIDTH as i32 - 1) as u16;
+        let y2 = (start.y.max(end.y) + PAD).clamp(0, DISPLAY_HEIGHT as i32 - 1) as u16;
 
         self.current_tiles.mark_rect(x1, y1, x2, y2);
 
