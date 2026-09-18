@@ -49,7 +49,8 @@ pub struct Display {
     front_buffer: Vec<Rgb565>,
     back_buffer: Vec<Rgb565>,
     current_tiles: TileTracker, // Tiles drawn this frame
-    prev_tiles: TileTracker,    // Tiles to clear (from 2 frames ago)
+    prev_tiles: TileTracker,    // Tiles drawn last frame
+    prev2_tiles: TileTracker,   // Tiles drawn two frames ago
 }
 
 #[derive(Clone, Copy)]
@@ -91,6 +92,11 @@ impl TileTracker {
 
     fn is_dirty(&self, tile_idx: usize) -> bool {
         tile_idx < TOTAL_TILES && self.dirty[tile_idx]
+    }
+
+    /// True if this tile is dirty in either generation.
+    fn is_dirty_in_either(&self, other: &Self, tile_idx: usize) -> bool {
+        self.is_dirty(tile_idx) || other.is_dirty(tile_idx)
     }
 }
 
@@ -246,6 +252,7 @@ impl Display {
             back_buffer,
             current_tiles: TileTracker::new(),
             prev_tiles: TileTracker::new(),
+            prev2_tiles: TileTracker::new(),
         })
     }
 }
@@ -349,7 +356,8 @@ impl DisplayTrait for Display {
             }
         }
 
-        // Save current tiles for clearing 2 frames later
+        // Age the dirty-tile generations by one frame
+        self.prev2_tiles = self.prev_tiles;
         self.prev_tiles = self.current_tiles;
         self.current_tiles.clear();
 
@@ -392,9 +400,13 @@ impl Display {
 
     /// Clears only the dirty tiles of the back buffer - call this at the start of each frame
     pub fn clear_buffer(&mut self) {
-        // Clear tiles that were dirty 2 frames ago
+        // After the swap, back_buffer holds the frame drawn two frames ago, so its stale
+        // pixels sit on prev2's tiles - but the push in update_with_buffer sends
+        // current | prev, so a tile can be pushed from either generation and must be clean
+        // in both. Clearing only one set leaves pixels that resurface when that tile next
+        // re-enters the pushed union.
         for tile_idx in 0..TOTAL_TILES {
-            if self.prev_tiles.is_dirty(tile_idx) {
+            if self.prev_tiles.is_dirty_in_either(&self.prev2_tiles, tile_idx) {
                 let tile_x = (tile_idx % TILES_X) as u16;
                 let tile_y = (tile_idx / TILES_X) as u16;
 
