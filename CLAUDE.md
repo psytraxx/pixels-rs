@@ -24,6 +24,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 . ~/export-esp.sh
 ```
 
+`export-esp.sh` is a bash script, so it cannot be sourced directly from fish. Under fish, wrap the build instead:
+```sh
+bash -c 'source ~/export-esp.sh; cargo check'
+```
+
 **Build for development:**
 ```sh
 cargo build
@@ -76,7 +81,10 @@ This executes: `espflash flash -c esp32s3 -s 16mb -m dio -f 80mhz --no-skip --mo
 **Tile-Based Rendering:**
 The display is divided into 16x16 pixel tiles (34 tiles wide × 15 tiles high = 510 total). The system tracks which tiles are "dirty" (need updating) each frame using `TileTracker`:
 - `current_tiles`: Tiles drawn to in the current frame
-- `prev_tiles`: Tiles that were dirty 2 frames ago (used for selective clearing)
+- `prev_tiles`: Tiles drawn in the previous frame
+- `prev2_tiles`: Tiles drawn two frames ago
+
+Three generations are needed because the two buffers age at different rates: after the swap, `back_buffer` holds the frame drawn two frames ago, while the push in `update_with_buffer()` sends `current | prev`. A tile can therefore be pushed from either generation and must be clean in both, so `clear_buffer()` clears `prev | prev2`. Clearing only one set leaves stale pixels that resurface when that tile next re-enters the pushed union.
 
 On `update_with_buffer()`, the system batches horizontally adjacent dirty tiles to minimize DMA transfers (~80% reduction). Only changed regions are sent to the display, reducing data transfer from ~257KB (full screen) to 40-80KB per frame.
 
@@ -86,13 +94,15 @@ The display maintains two framebuffers allocated in PSRAM:
 2. `front_buffer`: Contains the previous frame's data, sent to display
 
 The render cycle:
-1. Clear only tiles that were dirty 2 frames ago in back_buffer
+1. Clear the tiles in `prev | prev2` from back_buffer
 2. Draw current frame to back_buffer, marking tiles as dirty
 3. Swap buffers (back becomes front)
-4. Send only dirty tiles from front_buffer to display via batched DMA
-5. Save current dirty tiles for clearing in 2 frames
+4. Send the tiles in `current | prev` from front_buffer to display via batched DMA
+5. Age the generations by one frame (`prev2 = prev`, `prev = current`)
 
 This approach achieves 50-60 FPS (3.5× improvement over full-screen updates).
+
+Note that the cost of step 1 scales with the dirty-tile count, so anything that increases on-screen activity multiplies the per-frame PSRAM clear. Particles are never deactivated, so the pool saturates over time; a change that makes particles reach the boundary faster can push the dirty set toward all 510 tiles, turning each frame into a near-full 256KB clear plus a near-full-screen push and collapsing the frame rate.
 
 **Memory Management:**
 - DRAM heap: 73,744 bytes for general allocations
@@ -123,8 +133,8 @@ This approach achieves 50-60 FPS (3.5× improvement over full-screen updates).
 - MAX_PARTICLES = 200, EMISSION_RATE = 3/frame, PARTICLE_SPEED = 0.02
 - Particles emit from cube center (0,0,0) with random normalized velocities
 - Physics: Simple velocity integration with boundary reflection at ±1.0
-- Pseudo-random generation: Uses millisecond timestamp for deterministic randomness
-- Colors: RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA (randomly assigned on spawn)
+- Pseudo-random generation: xorshift32 (`Rng` in main.rs), seeded once from the boot timestamp. Do not derive per-particle randomness from the frame timestamp: it is constant within a frame, so every particle emitted that frame gets an identical direction and color, and `(t * k) % 1.0` collapses once the millisecond counter passes 2^23 and the f32 step exceeds 1.0
+- Colors: RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA (`PARTICLE_COLORS`, indexed randomly on spawn)
 - Rendering: Each particle is a 3x3 colored rectangle, rotates with cube
 
 **Touch Control:**
@@ -136,13 +146,13 @@ The async CST816x driver (drivers crate) monitors GPIO21 for touch interrupts:
 ### Important Hardware Details
 
 **PSRAM Access:**
-The `psram_allocator!` macro must be called after heap initialization to enable PSRAM allocations. PSRAM mode is configured via env var: `ESP_HAL_CONFIG_PSRAM_MODE = "octal"`.
+The `psram_allocator!(peripherals.PSRAM, esp_hal::psram)` macro must be called after heap initialization to enable PSRAM allocations (main.rs). `Vec` allocations made after that point land in PSRAM, which is how both framebuffers are allocated.
 
 **Power Management:**
 GPIO38 (PMICEN) must be set high to enable the power management IC before display initialization.
 
 **DMA Configuration:**
-SPI DMA uses a 32,000-byte TX buffer and a minimal 32-byte RX buffer (the display is write-only, but `DmaRxBuf` requires at least one descriptor) created with `dma_buffers!(32, 32000)`. The display staging buffer is 32,000 bytes, allocated in a static cell for 'static lifetime — it must match the DMA TX buffer size so mipidsi's `send_pixels` flushes in single large DMA transactions rather than 512-byte chunks.
+SPI DMA uses a 32,000-byte TX buffer and a minimal 32-byte RX buffer (the display is write-only, but `DmaRxBuf` requires at least one descriptor) created with `dma_rx_buffer!(32)` and `dma_tx_buffer!(32000)`. The display staging buffer is 32,000 bytes, allocated in a static cell for 'static lifetime — it must match the DMA TX buffer size so mipidsi's `send_pixels` flushes in single large DMA transactions rather than 512-byte chunks.
 
 **SPI Driver in RAM:**
 `ESP_HAL_PLACE_SPI_DRIVER_IN_RAM = "true"` ensures SPI driver code is placed in RAM for performance.
@@ -155,10 +165,10 @@ The display uses `Rotation::Deg270` with `mirrored: false` to achieve the correc
 
 ## Key Dependencies
 
-- **esp-hal (1.0.0)**: Hardware abstraction layer for ESP32-S3 with PSRAM support
-- **esp-rtos (0.2.0)**: RTOS integration with embassy async runtime, esp-alloc, and esp-radio
-- **mipidsi (git master)**: MIPI DSI display driver for RM67162 (awaiting official release > 0.9.0)
-- **drivers (git tag v0.14.0)**: CST816x async touch controller driver
+- **esp-hal (1.2.2)**: Hardware abstraction layer for ESP32-S3 with PSRAM support
+- **esp-rtos (0.4.0)**: RTOS integration with embassy async runtime, esp-alloc, and esp-radio
+- **mipidsi (0.10.0)**: MIPI DSI display driver for RM67162
+- **drivers (git tag v0.16.0)**: CST816x async touch controller driver
 - **embedded-graphics (0.8.1)**: 2D graphics primitives and drawing traits
 - **micromath (2.1.0)**: no_std quaternion and vector math
 - **embedded-hal-bus (0.3.0)**: Async SPI device abstraction
@@ -169,7 +179,7 @@ The display uses `Rotation::Deg270` with `mirrored: false` to achieve the correc
 
 **Changing Display Resolution:**
 1. Update `DISPLAY_WIDTH` and `DISPLAY_HEIGHT` in config.rs
-2. Recalculate tile constants in display.rs: `TILES_X`, `TILES_Y`, `TOTAL_TILES`
+2. `TILES_X`, `TILES_Y`, and `TOTAL_TILES` derive from those via `div_ceil`, so they follow automatically — but update the comments beside them, which state the current 34/15/510 values
 3. Verify PSRAM allocation is sufficient: `2 × width × height × 2` bytes
 
 **Adding Graphics Primitives:**
@@ -186,7 +196,8 @@ Create a `BufferDrawTarget` from `back_buffer` and use embedded-graphics `Drawab
 - EMISSION_RATE: Particles spawned per frame
 - PARTICLE_SPEED: Initial particle velocity magnitude
 - Boundary constraints: Currently ±1.0, modify clamp/bounce logic in particle update loop
-- Colors: Edit color selection logic based on `color_seed`
+- Colors: Edit the `PARTICLE_COLORS` table
+- Particle speed: Keep the emission velocity normalized to exactly `PARTICLE_SPEED`; scaling it by a random magnitude makes particles reach the ±1.0 boundary far sooner, saturating the pool and the dirty-tile set (see the note under the render cycle)
 
 **Memory Optimization:**
 - Heap size: Adjust `esp_alloc::heap_allocator!(size: 73744)` if more DRAM needed
